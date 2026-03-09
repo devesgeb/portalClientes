@@ -1,0 +1,32 @@
+# CodeIgniter 4
+/vendor/
+/public/uploads/
+
+# Environment
+.env
+*.env.local
+
+# Logs
+/writable/logs/*
+!/writable/logs/.gitkeep
+/writable/cache/*
+!/writable/cache/.gitkeep
+/writable/debugbar/*
+!/writable/debugbar/.gitkeep
+/writable/session/*
+!/writable/session/.gitkeep
+/writable/uploads/*
+!/writable/uploads/.gitkeep
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node (para el agente WhatsApp en el futuro)
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/

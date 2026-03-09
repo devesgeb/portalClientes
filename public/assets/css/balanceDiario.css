@@ -1,0 +1,395 @@
+/* ═══════════════════════════════════════════════════════════════
+   BALANCE DIARIO – Hoja de estilos
+   Ruta: public/assets/css/balanceDiario.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Variables ─────────────────────────────────────────────────── */
+:root {
+    --primary:      #2563eb;
+    --accent:       #6366f1;
+    --sidebar-bg:   #0f172a;
+    --sidebar-w:    240px;
+    --cobrar-head:  #2563eb;
+    --caja-head:    #0891b2;
+    --pagar-head:   #7c3aed;
+    --surface:      #f8fafc;
+    --border:       #e5eaf0;
+    --text-main:    #1a2940;
+    --text-sub:     #8fa3bc;
+}
+
+/* ── Reset / Base ───────────────────────────────────────────────── */
+*,
+*::before,
+*::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--surface);
+    color: var(--text-main);
+    display: flex;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════════════════════════════ */
+.sidebar {
+    width: var(--sidebar-w);
+    min-height: 100vh;
+    background: var(--sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    padding: 0;
+    box-shadow: 2px 0 18px rgba(0,0,0,.18);
+}
+
+.sidebar-logo {
+    padding: 22px 20px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.logo-text {
+    font-size: .95rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -.01em;
+}
+
+.logo-sub {
+    font-size: .65rem;
+    color: rgba(255,255,255,.35);
+    margin-top: 1px;
+}
+
+/* Nav links */
+.sidebar-nav {
+    flex: 1;
+    padding: 14px 12px;
+    overflow-y: auto;
+}
+
+.nav-sec {
+    font-size: .60rem;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.28);
+    padding: 14px 8px 6px;
+}
+
+.s-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    color: rgba(255,255,255,.55);
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 500;
+    transition: background .15s, color .15s;
+    margin-bottom: 2px;
+}
+
+.s-link i { font-size: 1rem; min-width: 18px; text-align: center; }
+
+.s-link:hover {
+    background: rgba(255,255,255,.08);
+    color: #fff;
+}
+
+.s-link.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(99,102,241,.40);
+}
+
+/* Sidebar footer */
+.sidebar-foot {
+    padding: 16px 18px;
+    border-top: 1px solid rgba(255,255,255,.07);
+}
+
+.u-avatar {
+    width: 34px;
+    height: 34px;
+    background: var(--accent);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .72rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.u-name  { font-size: .80rem; font-weight: 600; color: #fff; }
+.u-role  { font-size: .67rem; color: rgba(255,255,255,.38); margin-top: 1px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   MAIN CONTENT
+══════════════════════════════════════════════════════════════════ */
+.main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ── Top Bar ────────────────────────────────────────────────────── */
+.topbar {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 1px 8px rgba(0,0,0,.05);
+}
+
+.topbar-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.topbar-sub {
+    font-size: .72rem;
+    color: var(--text-sub);
+    margin-top: 1px;
+}
+
+.date-badge {
+    background: #f0f4f9;
+    color: #5a7394;
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: .76rem;
+    font-weight: 500;
+}
+
+/* ── Page body ──────────────────────────────────────────────────── */
+.page-body {
+    padding: 24px 28px;
+    flex: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   KPI CARDS
+══════════════════════════════════════════════════════════════════ */
+.kpi-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.05);
+    border: 1px solid var(--border);
+    transition: box-shadow .2s, transform .2s;
+}
+
+.kpi-card:hover {
+    box-shadow: 0 4px 18px rgba(0,0,0,.09);
+    transform: translateY(-2px);
+}
+
+.kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.20rem;
+    flex-shrink: 0;
+}
+
+.kpi-val  { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+.kpi-lbl  { font-size: .72rem;  font-weight: 600; color: var(--text-sub); margin-top: 2px; }
+.kpi-sub  { font-size: .68rem;  color: var(--text-sub); margin-top: 2px; }
+
+/* ══════════════════════════════════════════════════════════════════
+   PANELS (columnas balance)
+══════════════════════════════════════════════════════════════════ */
+.panel {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Panel header */
+.panel-head {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.ph-title {
+    font-size: .82rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.ph-title i { font-size: 1rem; }
+
+/* Panel body (scrollable table area) */
+.panel-body {
+    overflow-y: auto;
+    max-height: 360px;
+}
+
+/* Panel total footer */
+.panel-total {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fafbfc;
+}
+
+.total-label {
+    font-size: .76rem;
+    font-weight: 600;
+    color: var(--text-sub);
+}
+
+.total-value {
+    font-size: 1.10rem;
+    font-weight: 800;
+    letter-spacing: -.01em;
+}
+
+.amt-cobrar { color: var(--cobrar-head); }
+.amt-caja   { color: var(--caja-head);   }
+.amt-pagar  { color: var(--pagar-head);  }
+
+/* ══════════════════════════════════════════════════════════════════
+   TABLE
+══════════════════════════════════════════════════════════════════ */
+.tbl thead th {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-sub);
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border);
+    padding: 9px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.tbl tbody tr {
+    transition: background .12s;
+}
+
+.tbl tbody tr:hover {
+    background: #f5f8ff;
+}
+
+.tbl tbody td {
+    font-size: .80rem;
+    padding: 9px 12px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f0f4f9;
+    color: var(--text-main);
+}
+
+/* ── Action buttons inside table ────────────────────────────────── */
+.btn-act {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: none;
+    background: #f0f4f9;
+    color: #5a7394;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .78rem;
+    cursor: pointer;
+    transition: background .15s, color .15s, transform .12s;
+    padding: 0;
+}
+
+.btn-act:hover           { background: #e2eaf5; transform: scale(1.10); }
+.btn-act.add:hover       { background: #dcfce7; color: #16a34a; }
+.btn-act.det:hover       { background: #eff6ff; color: var(--primary); }
+.btn-act.edit:hover      { background: #fef9c3; color: #b45309; }
+.btn-act.del:hover       { background: #fee2e2; color: #dc2626; }
+
+/* ── Inline notes textarea ──────────────────────────────────────── */
+.notes-input {
+    width: 100%;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: .76rem;
+    font-family: inherit;
+    resize: none;
+    background: transparent;
+    color: var(--text-main);
+    transition: border .15s, background .15s;
+}
+
+.notes-input:focus {
+    outline: none;
+    border-color: var(--border);
+    background: #f8fafc;
+}
+
+/* ── Add row inline form ────────────────────────────────────────── */
+.add-row-form {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: #f8fafc;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    :root { --sidebar-w: 0px; }
+
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform .25s;
+    }
+
+    .main {
+        margin-left: 0;
+    }
+
+    .page-body {
+        padding: 16px;
+    }
+
+    .topbar {
+        padding: 12px 16px;
+    }
+}
