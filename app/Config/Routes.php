@@ -38,11 +38,39 @@ $routes->get('/home/index', 'Home::index');
 $routes->get('/balance-diario', 'BalanceDiario::index');
 
 // ── Cuentas por Cobrar (API JSON)
-$routes->post('/cuentas-cobrar/guardar', 'BalanceDiario::guardar');
-$routes->post('/cuentas-cobrar/sincronizar', 'BalanceDiario::sincronizar');
+$routes->get('/cuentas-cobrar/pendientes', 'BalanceDiario::pendientesCobrar');
+$routes->post('/cuentas-cobrar/sincronizar', 'BalanceDiario::sincronizarCobrar');
 $routes->delete('/cuentas-cobrar/eliminar', 'BalanceDiario::eliminarCobrar');
-$routes->get('/cuentas-cobrar/pendientes', 'BalanceDiario::pendientes');
+// Verificar si N° documento existe
+$routes->get('/cuentas-cobrar/verificar-documento', 'BalanceDiario::verificarDocumento');
+
+// ── Cuentas por Pagar (API JSON)
+$routes->get('/cuentas-pagar/pendientes', 'BalanceDiario::pendientesPagar');
+$routes->post('/cuentas-pagar/sincronizar', 'BalanceDiario::sincronizarPagar');
+$routes->delete('/cuentas-pagar/eliminar', 'BalanceDiario::eliminarPagar');
+// Verificar si N° documento existe en Pagar
+$routes->get('/cuentas-pagar/verificar-documento', 'BalanceDiario::verificarDocumentoPagar');
+
 $routes->get('/home/validaUser', function () {
     return "GET a validaUser funcionando";
 });
 $routes->post('/home/validaUser', 'Home::validaUser');
+
+// ── Panel de Administración
+$routes->get('/admin', 'AdminController::index');
+$routes->get('/admin/', 'AdminController::index');
+// ── Cargar Clientes / Proveedores
+$routes->get('/cargar-entidad', 'CargarEntidadController::index');
+$routes->post('/importar-clientes', 'CargarEntidadController::importarClientes');
+$routes->post('/importar-proveedores', 'CargarEntidadController::importarProveedores');
+
+// ── Buscar Clientes / Proveedores
+$routes->get('/buscar-entidad', 'BuscarEntidadController::index');
+$routes->get('/buscar-entidad/buscar', 'BuscarEntidadController::buscar');
+$routes->get('/buscar-entidad/detalle', 'BuscarEntidadController::detalle');
+$routes->put('/buscar-entidad/actualizar', 'BuscarEntidadController::actualizar');
+$routes->delete('/buscar-entidad/eliminar', 'BuscarEntidadController::eliminar');
+
+// Autocomplete clientes / proveedores
+$routes->get('/clientes/buscar', 'BalanceDiario::buscarClientes');
+$routes->get('/proveedores/buscar', 'BalanceDiario::buscarProveedores');
