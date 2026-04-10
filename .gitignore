@@ -30,3 +30,20 @@ Thumbs.db
 node_modules/
 .wwebjs_auth/
 .wwebjs_cache/
+
+# Scripts de desarrollo local (no van al hosting)
+_migrate_to_hosting.py
+_test_hosting.py
+_patch_btn.py
+setup_git_hosting.py
+public/assets/js/app/patch_*.ps1
+public/assets/js/app/fix_*.ps1
+public/assets/js/app/find_*.ps1
+public/assets/js/app/inject_*.ps1
+public/assets/js/app/force_*.ps1
+public/assets/js/app/show_*.ps1
+public/assets/js/app/check_*.ps1
+public/assets/js/app/verify_*.ps1
+
+# Deploy log
+storage/logs/deploy.log
