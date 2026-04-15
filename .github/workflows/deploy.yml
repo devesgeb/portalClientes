@@ -1,0 +1,49 @@
+name: Deploy a Hosting via FTP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy FTP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # necesario para detectar archivos cambiados
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:           ${{ secrets.FTP_HOST }}
+          username:         ${{ secrets.FTP_USER }}
+          password:         ${{ secrets.FTP_PASS }}
+          server-dir:       /public_html/Portal/
+          local-dir:        ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.agents/**
+            **/node_modules/**
+            **/.env
+            **/_migrate_to_hosting.py
+            **/_test_hosting.py
+            **/_patch_btn.py
+            **/setup_git_hosting.py
+            **/writable/logs/**
+            **/writable/cache/**
+            **/writable/session/**
+            **/writable/debugbar/**
+            **/public/assets/js/app/fix_*.ps1
+            **/public/assets/js/app/patch_*.ps1
+            **/public/assets/js/app/find_*.ps1
+            **/public/assets/js/app/inject_*.ps1
+            **/public/assets/js/app/force_*.ps1
+            **/public/assets/js/app/show_*.ps1
+            **/public/assets/js/app/check_*.ps1
+            **/public/assets/js/app/verify_*.ps1
+          log-level: verbose
