@@ -16,39 +16,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server:           ${{ secrets.FTP_HOST }}
-          username:         ${{ secrets.FTP_USER }}
-          password:         ${{ secrets.FTP_PASS }}
-          server-dir:       /portal/
-          local-dir:        ./
-          protocol:         ftp
-          port:             21
-          security:         loose
-          timeout:          60000
-          dangerous-clean-slate: false
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/.agents/**
-            **/node_modules/**
-            **/.env
-            **/_migrate_to_hosting.py
-            **/_test_hosting.py
-            **/_patch_btn.py
-            **/setup_git_hosting.py
-            **/writable/logs/**
-            **/writable/cache/**
-            **/writable/session/**
-            **/writable/debugbar/**
-            **/public/assets/js/app/fix_*.ps1
-            **/public/assets/js/app/patch_*.ps1
-            **/public/assets/js/app/find_*.ps1
-            **/public/assets/js/app/inject_*.ps1
-            **/public/assets/js/app/force_*.ps1
-            **/public/assets/js/app/show_*.ps1
-            **/public/assets/js/app/check_*.ps1
-            **/public/assets/js/app/verify_*.ps1
-          log-level: verbose
+      - name: Instalar lftp
+        run: sudo apt-get install -y lftp
+
+      - name: Deploy via lftp
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          lftp -c "
+          set ftp:ssl-allow no;
+          set ftp:passive-mode yes;
+          set net:timeout 60;
+          set net:max-retries 3;
+          set net:reconnect-interval-base 5;
+          open ftp://$FTP_USER:$FTP_PASS@$FTP_HOST;
+          mirror --reverse --delete --verbose \
+            --exclude .git \
+            --exclude .agents \
+            --exclude node_modules \
+            --exclude .env \
+            --exclude _migrate_to_hosting.py \
+            --exclude _test_hosting.py \
+            --exclude setup_git_hosting.py \
+            --exclude writable/logs \
+            --exclude writable/cache \
+            --exclude writable/session \
+            . /portal/;
+          bye;
+          "
