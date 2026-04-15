@@ -50,9 +50,8 @@ class Home extends BaseController
             );
             $session = session();
             $session->set($data);
-            $carga = $this->carga($data, $data['is_logued_in']);
 
-            return view('balance_diario', $carga);
+            return redirect()->to(site_url('admin'));
         }
         else {
 

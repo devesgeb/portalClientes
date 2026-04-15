@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Admin – Panel de Administración</title>
+    <meta name="description" content="Panel de administración del Portal de Clientes.">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+
+<body>
+
+    <!-- ══════════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════════ -->
+    <div class="sidebar">
+        <!-- Logo -->
+        <div class="sidebar-logo">
+            <div class="d-flex align-items-center gap-2">
+                <div style="width:34px;height:34px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-grid-fill text-white" style="font-size:.95rem;"></i>
+                </div>
+                <div>
+                    <div class="logo-text">Portal Admin</div>
+                    <div class="logo-sub">v1.0.0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nav -->
+        <nav class="sidebar-nav">
+
+            <!-- Clientes / Proveedores -->
+            <div class="nav-sec">Clientes / Proveedores</div>
+            <button class="s-parent" onclick="toggleMenu('menuCP')" id="parentCP">
+                <i class="bi bi-people-fill"></i>
+                <span>Clientes / Proveedores</span>
+                <i class="bi bi-chevron-right chevron"></i>
+            </button>
+            <div class="sub-nav" id="menuCP">
+                <a href="#" class="sub-link" data-section="cargar-entidad">
+                    <i class="bi bi-cloud-upload"></i> Cargar cliente o proveedor
+                </a>
+                <a href="#" class="sub-link" data-section="buscar-entidad">
+                    <i class="bi bi-search"></i> Buscar cliente o proveedor
+                </a>
+            </div>
+
+            <!-- Contabilidad -->
+            <div class="nav-sec">Contabilidad</div>
+            <button class="s-parent" onclick="toggleMenu('menuContab')" id="parentContab">
+                <i class="bi bi-calculator-fill"></i>
+                <span>Contabilidad</span>
+                <i class="bi bi-chevron-right chevron"></i>
+            </button>
+            <div class="sub-nav" id="menuContab">
+                <a href="balance_diario.php" class="sub-link">
+                    <i class="bi bi-bar-chart-line-fill"></i> Balance diario
+                </a>
+                <a href="#" class="sub-link" data-section="gastos-diarios">
+                    <i class="bi bi-receipt-cutoff"></i> Registro de gastos diarios
+                </a>
+                <a href="#" class="sub-link" data-section="pagos-mensuales">
+                    <i class="bi bi-calendar-check-fill"></i> Pagos mensuales
+                </a>
+                <a href="#" class="sub-link" data-section="historial-balances">
+                    <i class="bi bi-clock-history"></i> Historial de balances
+                </a>
+            </div>
+
+            <!-- La Tienda -->
+            <div class="nav-sec">La Tienda</div>
+            <button class="s-parent" onclick="toggleMenu('menuTienda')" id="parentTienda">
+                <i class="bi bi-shop"></i>
+                <span>La Tienda</span>
+                <i class="bi bi-chevron-right chevron"></i>
+            </button>
+            <div class="sub-nav" id="menuTienda">
+                <a href="#" class="sub-link" data-section="productos">
+                    <i class="bi bi-box-seam-fill"></i> Productos
+                </a>
+                <a href="#" class="sub-link" data-section="mis-pedidos">
+                    <i class="bi bi-bag-check-fill"></i> Mis pedidos
+                </a>
+            </div>
+
+            <!-- Devoluciones -->
+            <div class="nav-sec">Devoluciones</div>
+            <button class="s-parent" onclick="toggleMenu('menuDev')" id="parentDev">
+                <i class="bi bi-arrow-return-left"></i>
+                <span>Devoluciones</span>
+                <i class="bi bi-chevron-right chevron"></i>
+            </button>
+            <div class="sub-nav" id="menuDev">
+                <a href="#" class="sub-link" data-section="solicitar-devolucion">
+                    <i class="bi bi-send-check"></i> Solicitar devolución
+                </a>
+                <a href="#" class="sub-link" data-section="historial-devoluciones">
+                    <i class="bi bi-archive"></i> Historial de devoluciones
+                </a>
+            </div>
+
+            <!-- Administración -->
+            <div class="nav-sec">Administración</div>
+            <button class="s-parent" onclick="toggleMenu('menuAdmin')" id="parentAdmin">
+                <i class="bi bi-gear-fill"></i>
+                <span>Administración</span>
+                <i class="bi bi-chevron-right chevron"></i>
+            </button>
+            <div class="sub-nav" id="menuAdmin">
+                <a href="#" class="sub-link" data-section="usuarios">
+                    <i class="bi bi-person-fill-gear"></i> Usuarios
+                </a>
+                <a href="#" class="sub-link" data-section="cuentas-bancarias">
+                    <i class="bi bi-bank2"></i> Cuentas bancarias
+                </a>
+                <a href="#" class="sub-link" data-section="datos-empresa">
+                    <i class="bi bi-building"></i> Datos de la empresa
+                </a>
+                <a href="#" class="sub-link" data-section="sucursales">
+                    <i class="bi bi-geo-alt-fill"></i> Mis sucursales
+                </a>
+                <a href="#" class="sub-link" data-section="api-config">
+                    <i class="bi bi-plug-fill"></i> API
+                </a>
+            </div>
+
+        </nav>
+
+        <!-- Footer usuario -->
+        <div class="sidebar-foot">
+            <div class="d-flex align-items-center gap-2">
+                <div class="u-avatar" id="sidebarAvatar">--</div>
+                <div>
+                    <div class="u-name" id="sidebarNombre">Cargando...</div>
+                    <div class="u-role" id="sidebarRol">Administrador</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MAIN CONTENT
+    ══════════════════════════════════════════ -->
+    <div class="main">
+
+        <!-- Top Bar -->
+        <div class="topbar">
+            <!-- Título dinámico de sección -->
+            <div>
+                <div class="topbar-title" id="topbarTitle">
+                    <i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--accent);"></i>Panel de Administración
+                </div>
+                <div class="topbar-sub" id="topbarSub">Portal Admin &rsaquo; Módulos del sistema</div>
+            </div>
+
+            <!-- Derecha: fecha + usuario -->
+            <div class="d-flex align-items-center gap-2">
+                <span class="date-badge" id="fechaBadge">
+                    <i class="bi bi-calendar3 me-1"></i><span id="fechaHoy"></span>
+                </span>
+
+                <!-- Badge usuario (clic abre modal info) -->
+                <div class="user-badge" onclick="abrirModalAdmin()" title="Ver información del administrador">
+                    <div class="ub-avatar" id="topbarAvatar">--</div>
+                    <div>
+                        <div class="ub-name" id="topbarNombre">Cargando...</div>
+                        <div class="ub-role" id="topbarRol">Administrador</div>
+                    </div>
+                    <i class="bi bi-info-circle ms-1" style="color:var(--text-sub);font-size:.80rem;"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido principal -->
+        <div class="page-body">
+            <div class="content-area" id="contentArea">
+                <div class="ca-icon">
+                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                </div>
+                <h5 id="contentTitle">Bienvenido al Panel de Administración</h5>
+                <p id="contentDesc">Selecciona una opción del menú lateral para comenzar a trabajar.</p>
+            </div>
+        </div>
+
+    </div><!-- /main -->
+
+
+    <!-- ══════════════════════════════════════════
+         MODAL – Información del Administrador
+    ══════════════════════════════════════════ -->
+    <div class="modal fade" id="modalAdminInfo" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;">
+                <!-- Header -->
+                <div class="modal-header py-3" style="background:linear-gradient(135deg,#1e1b4b,#4338ca);border:none;">
+                    <h6 class="modal-title text-white fw-700">
+                        <i class="bi bi-person-badge-fill me-2"></i>Información del Administrador
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+                </div>
+                <!-- Body -->
+                <div class="modal-body p-4">
+                    <!-- Avatar grande -->
+                    <div class="admin-avatar-lg" id="modalAdminAvatar">--</div>
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <div style="font-size:1.05rem;font-weight:700;color:var(--text-main);" id="modalAdminNombre">--</div>
+                        <div style="font-size:.76rem;color:var(--text-sub);margin-top:2px;" id="modalAdminPerfil">--</div>
+                    </div>
+
+                    <div id="modalAdminRows">
+                        <!-- Filas inyectadas por JS -->
+                    </div>
+
+                    <!-- Estado del acceso -->
+                    <div style="margin-top:14px;padding:10px 14px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;font-size:.78rem;color:#15803d;display:flex;align-items:center;gap:8px;" id="modalEstadoAcceso">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>Cuenta activa</span>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
+                    <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toastWrapper" style="position:fixed;bottom:24px;right:24px;z-index:9999;"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>window.ADMIN_BASE_URL = "../../../index.php";</script>
+    <script src="../assets/js/admin.js"></script>
+
+</body>
+</html>
