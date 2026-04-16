@@ -144,6 +144,10 @@ body {
     padding: 14px 18px;
     border-top: 1px solid rgba(255,255,255,.07);
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
 }
 
 .u-avatar {

@@ -131,13 +131,24 @@ function sbOpenClass(array $g, string $active): string
     </nav>
 
     <div class="sidebar-foot">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2" style="flex:1;min-width:0;">
             <div class="u-avatar" id="sidebarAvatar">--</div>
-            <div>
-                <div class="u-name" id="sidebarNombre">Cargando...</div>
+            <div style="min-width:0;flex:1;">
+                <div class="u-name" id="sidebarNombre" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Cargando...</div>
                 <div class="u-role" id="sidebarRol">Administrador</div>
             </div>
         </div>
+        <a href="<?= site_url('logout') ?>"
+           title="Cerrar sesión"
+           onclick="return confirm('¿Seguro que deseas cerrar sesión?')"
+           style="flex-shrink:0;width:34px;height:34px;border-radius:10px;
+                  background:rgba(239,68,68,.12);color:#f87171;border:1.5px solid rgba(239,68,68,.2);
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:1rem;text-decoration:none;transition:.2s;"
+           onmouseover="this.style.background='#ef4444';this.style.color='#fff';"
+           onmouseout="this.style.background='rgba(239,68,68,.12)';this.style.color='#f87171';">
+            <i class="bi bi-box-arrow-right"></i>
+        </a>
     </div>
 </div>
 <script>
