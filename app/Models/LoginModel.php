@@ -1,90 +1,91 @@
 <?php
 
-namespace App\Models; // Namespace correcto
+namespace App\Models;
 
 use CodeIgniter\Model;
 
 class LoginModel extends Model
 {
-    protected $table = 'tbl_users'; // Nombre de la tabla
-    protected $primaryKey = 'id'; // Clave primaria
-
-    protected $returnType = 'array'; // array|object
+    protected $table      = 'tbl_usuarios';
+    protected $primaryKey = 'id';
+    protected $returnType = 'array';
     protected $useSoftDeletes = false;
 
-    // Campos que se pueden insertar/actualizar
     protected $allowedFields = [
-        'nombre',
-        'rut',
-        'clave'
+        'perfil_id', 'nombre', 'apellidos', 'rut',
+        'email', 'clave', 'telefono', 'estado'
     ];
 
     protected $useTimestamps = true;
-    protected $createdField = 'created_at';
-    protected $updatedField = 'updated_at';
-
-    // Validaciones
-    protected $validationRules = [
-        'username' => 'required|min_length[3]|is_unique[usuarios.username]',
-        'email' => 'required|valid_email|is_unique[usuarios.email]',
-        'password' => 'required|min_length[6]'
-    ];
-
-    protected $validationMessages = [];
-    protected $skipValidation = false;
+    protected $createdField  = 'created_at';
+    protected $updatedField  = 'updated_at';
 
     /**
-     * Verificar credenciales de login
+     * Verificar credenciales de login.
+     * Busca por nombre de usuario (campo 'nombre') y verifica la clave.
+     * Soporta claves hasheadas (password_hash) y texto plano (legacy).
      */
-
-
-    public function verificarLogin($username, $password)
+    public function verificarLogin(string $username, string $password)
     {
+        $db      = \Config\Database::connect();
+        $builder = $db->table('tbl_usuarios');
+        $builder->select('tbl_usuarios.id, tbl_usuarios.nombre, tbl_usuarios.apellidos,
+                          tbl_usuarios.email, tbl_usuarios.rut, tbl_usuarios.telefono,
+                          tbl_usuarios.clave, tbl_usuarios.estado, tbl_usuarios.perfil_id,
+                          tbl_perfiles.nombre AS perfil_nombre')
+                ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left')
+                ->where('tbl_usuarios.nombre', $username)
+                ->where('tbl_usuarios.estado', 1);
 
-        $db = \Config\Database::connect();
-
-        $builder = $db->table('tbl_users');
-        $builder->select('id, nombre, clave');
-        $builder->where('clave', $password);
-        $builder->where('nombre', $username);
         $query = $builder->get();
 
-        if ($query->getNumRows() > 0) {
-            return $query->getResultArray();
+        if ($query->getNumRows() === 0) {
+            return false;
         }
 
-        return false;
+        $user = $query->getRowArray();
 
+        // Soporte para clave hasheada (password_hash) y texto plano (legacy)
+        $claveValida = password_verify($password, $user['clave'])
+                    || $user['clave'] === $password;
 
+        if (!$claveValida) {
+            return false;
+        }
 
+        // Actualizar último acceso
+        $db->table('tbl_usuarios')
+           ->where('id', $user['id'])
+           ->update(['ultimo_acceso' => date('Y-m-d H:i:s')]);
 
-
+        return [$user];
     }
 
     /**
-     * Obtener usuario completo por ID (para panel admin)
+     * Obtener usuario completo por ID (para panel admin / topbar).
      */
     public function obtenerPorId(int $id): array
     {
-        $db = \Config\Database::connect();
-        $builder = $db->table('tbl_users');
-        $builder->select('id, nombre, clave, id_perfil');
-        $builder->where('id', $id);
+        $db      = \Config\Database::connect();
+        $builder = $db->table('tbl_usuarios');
+        $builder->select('tbl_usuarios.*, tbl_perfiles.nombre AS perfil_nombre')
+                ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left')
+                ->where('tbl_usuarios.id', $id);
+
         $query = $builder->get();
 
         if ($query->getNumRows() > 0) {
             $row = $query->getRowArray();
-            // Normalizar al formato esperado por la vista
             return [
-                'id' => $row['id'],
-                'nombre' => $row['nombre'],
-                'apellidos' => '',
-                'email' => '',
-                'rut' => '',
-                'telefono' => '',
-                'estado' => 1,
-                'ultimo_acceso' => null,
-                'perfil' => $row['id_perfil'] == 1 ? 'Administrador' : 'Usuario',
+                'id'            => $row['id'],
+                'nombre'        => $row['nombre'],
+                'apellidos'     => $row['apellidos'] ?? '',
+                'email'         => $row['email']     ?? '',
+                'rut'           => $row['rut']        ?? '',
+                'telefono'      => $row['telefono']   ?? '',
+                'estado'        => $row['estado'],
+                'ultimo_acceso' => $row['ultimo_acceso'] ?? null,
+                'perfil'        => $row['perfil_nombre'] ?? 'Administrador',
             ];
         }
 
@@ -94,5 +95,4 @@ class LoginModel extends Model
             'estado' => 1, 'ultimo_acceso' => null, 'perfil' => 'Administrador',
         ];
     }
-
 }
