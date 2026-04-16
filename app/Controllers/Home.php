@@ -33,43 +33,28 @@ class Home extends BaseController
 
     public function validaUser()
     {
+        $username = $this->request->getPost('Usuario') ?? '';
+        $password = $this->request->getPost('Clave')   ?? '';
 
-        // $this->form_validation->set_rules('Usuario', 'nombre de usuario', 'required|trim|min_length[2]|max_length[30]|xss_clean');
-        //  $this->form_validation->set_rules('Clave', 'Clave', 'required|trim|min_length[5]|max_length[30]|xss_clean');
-        $username = $_REQUEST['Usuario'];
-        $password = $_REQUEST['Clave'];
+        if (!$username || !$password) {
+            session()->setFlashdata('login_error', 'Por favor ingresa usuario y contraseña.');
+            return redirect()->to(site_url('/'));
+        }
 
         $check_user = $this->loginModel->verificarLogin($username, $password);
 
-
-        if ($check_user == TRUE) {
-
-            $data = array(
-                'is_logued_in' => $check_user[0]['id'],
-                'Nombre' => $check_user[0]['nombre'],
-            );
+        if ($check_user !== false) {
             $session = session();
-            $session->set($data);
-
+            $session->set([
+                'is_logued_in' => $check_user[0]['id'],
+                'Nombre'       => $check_user[0]['nombre'],
+            ]);
             return redirect()->to(site_url('admin'));
         }
-        else {
 
-            $assets_path = $this->assets_url();
-            $data = [
-                'title' => ['Página Principal'],
-                'css' => ['../' . $assets_path['css_path'][0] . 'styles.css'],
-                'js' => ['../' . $assets_path['js_path'][0] . 'bootstrap.bundle.min.js'],
-                'img' => ['../' . $assets_path['img_path'][0]]
-            ];
-
-
-            return view('login', $data);
-
-        }
-
-
-
+        // Credenciales inválidas → volver al login con mensaje
+        session()->setFlashdata('login_error', 'Usuario o contraseña incorrectos. Intenta nuevamente.');
+        return redirect()->to(site_url('/'));
     }
 
     public function carga($session, $tipouser)
