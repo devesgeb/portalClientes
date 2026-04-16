@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Partial: Sidebar compartido
  * Variables opcionales:
@@ -111,7 +111,7 @@ function sbOpenClass(array $g, string $active): string
             <i class="bi bi-chevron-right chevron"></i>
         </button>
         <div class="sub-nav" id="menuAdmin" class="sub-nav<?= sbOpenClass($adminOpen, $activePage) ?>">
-            <a href="<?= site_url('admin') ?>" class="sub-link<?= sbActive('usuarios', $activePage) ?>">
+            <a href="<?= site_url('usuarios') ?>" class="sub-link<?= sbActive('usuarios', $activePage) ?>">
                 <i class="bi bi-person-fill-gear"></i> Usuarios
             </a>
             <a href="#" class="sub-link<?= sbActive('cuentas-bancarias', $activePage) ?>">

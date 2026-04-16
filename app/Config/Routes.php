@@ -56,6 +56,13 @@ $routes->get('/cuentas-pagar/verificar-documento', 'BalanceDiario::verificarDocu
 // ── Panel de Administración
 $routes->get('/admin', 'AdminController::index');
 $routes->get('/admin/', 'AdminController::index');
+
+// ── Usuarios
+$routes->get('/usuarios',              'UsuariosController::index');
+$routes->get('/usuarios/lista',        'UsuariosController::lista');
+$routes->post('/usuarios/guardar',     'UsuariosController::guardar');
+$routes->delete('/usuarios/eliminar/(:num)', 'UsuariosController::eliminar/$1');
+$routes->patch('/usuarios/toggle-estado/(:num)', 'UsuariosController::toggleEstado/$1');
 // ── Cargar Clientes / Proveedores
 $routes->get('/cargar-entidad', 'CargarEntidadController::index');
 $routes->post('/importar-clientes', 'CargarEntidadController::importarClientes');
