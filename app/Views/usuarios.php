@@ -117,11 +117,16 @@
 
 <div class="main">
     <div class="topbar">
-        <div>
-            <div class="topbar-title">
-                <i class="bi bi-people-fill me-2" style="color:var(--accent);"></i>Gestión de Usuarios
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn-menu-toggle" onclick="abrirSidebar()" aria-label="Abrir menú">
+                <i class="bi bi-list"></i>
+            </button>
+            <div>
+                <div class="topbar-title">
+                    <i class="bi bi-people-fill me-2" style="color:var(--accent);"></i>Gestión de Usuarios
+                </div>
+                <div class="topbar-sub">Administración › Usuarios del sistema</div>
             </div>
-            <div class="topbar-sub">Administración › Usuarios del sistema</div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="date-badge">

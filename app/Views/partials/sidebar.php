@@ -25,7 +25,10 @@ function sbOpenClass(array $g, string $active): string
     return in_array($active, $g) ? ' open' : '';
 }
 ?>
-<div class="sidebar">
+<!-- Overlay móvil -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="cerrarSidebar()"></div>
+
+<div class="sidebar" id="mainSidebar">
     <div class="sidebar-logo">
         <img src="<?= base_url('public/assets/img/logo_empresa.png') ?>"
              alt="Logo"
@@ -187,4 +190,22 @@ function sbOpenClass(array $g, string $active): string
             });
         });
     })();
+
+    // ── Toggle sidebar móvil ──────────────────────────────────────
+    function abrirSidebar() {
+        document.getElementById('mainSidebar').classList.add('open');
+        document.getElementById('sidebarOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function cerrarSidebar() {
+        document.getElementById('mainSidebar').classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    // Cerrar sidebar al navegar (móvil)
+    document.querySelectorAll('.sub-link[href]:not([href="#"])').forEach(function(a) {
+        a.addEventListener('click', function() {
+            if (window.innerWidth <= 768) cerrarSidebar();
+        });
+    });
 </script>

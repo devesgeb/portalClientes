@@ -17,11 +17,16 @@
 <!-- MAIN -->
 <div class="main">
     <div class="topbar">
-        <div>
-            <div class="topbar-title" id="topbarTitle">
-                <i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--accent);"></i>Panel de Administración
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn-menu-toggle" onclick="abrirSidebar()" aria-label="Abrir menú">
+                <i class="bi bi-list"></i>
+            </button>
+            <div>
+                <div class="topbar-title" id="topbarTitle">
+                    <i class="bi bi-grid-3x3-gap-fill me-2" style="color:var(--accent);"></i>Panel de Administración
+                </div>
+                <div class="topbar-sub" id="topbarSub">Portal Admin &rsaquo; Módulos del sistema</div>
             </div>
-            <div class="topbar-sub" id="topbarSub">Portal Admin &rsaquo; Módulos del sistema</div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="date-badge">
