@@ -6,11 +6,17 @@ use CodeIgniter\Model;
 
 class UsuariosModel extends Model
 {
-    protected $table      = 'tbl_usuarios';
+    protected $table = 'tbl_usuarios';
     protected $primaryKey = 'id';
     protected $allowedFields = [
-        'perfil_id', 'nombre', 'apellidos', 'rut',
-        'email', 'clave', 'telefono', 'estado'
+        'perfil_id',
+        'nombre',
+        'apellidos',
+        'rut',
+        'email',
+        'clave',
+        'telefono',
+        'estado'
     ];
     protected $useTimestamps = true;
 
@@ -21,7 +27,7 @@ class UsuariosModel extends Model
     public function getUsuarios(int $perfil_id = 0): array
     {
         $this->select('tbl_usuarios.*, tbl_perfiles.nombre AS perfil_nombre')
-             ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left');
+            ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left');
 
         if ($perfil_id > 0) {
             $this->where('tbl_usuarios.perfil_id', $perfil_id);
@@ -36,9 +42,9 @@ class UsuariosModel extends Model
     public function getUsuario(int $id): ?array
     {
         return $this->select('tbl_usuarios.*, tbl_perfiles.nombre AS perfil_nombre')
-                    ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left')
-                    ->where('tbl_usuarios.id', $id)
-                    ->first();
+            ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left')
+            ->where('tbl_usuarios.id', $id)
+            ->first();
     }
 
     /**
