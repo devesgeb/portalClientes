@@ -34,7 +34,10 @@ class LoginModel extends Model
                           tbl_usuarios.clave, tbl_usuarios.estado, tbl_usuarios.perfil_id,
                           tbl_perfiles.nombre AS perfil_nombre')
                 ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left')
-                ->where('tbl_usuarios.nombre', $username)
+                ->groupStart()
+                    ->where('tbl_usuarios.nombre', $username)
+                    ->orWhere('tbl_usuarios.email', $username)
+                ->groupEnd()
                 ->where('tbl_usuarios.estado', 1);
 
         $query = $builder->get();
@@ -45,9 +48,10 @@ class LoginModel extends Model
 
         $user = $query->getRowArray();
 
-        // Soporte para clave hasheada (password_hash) y texto plano (legacy)
-        $claveValida = password_verify($password, $user['clave'])
-                    || $user['clave'] === $password;
+        // Verificar clave: primero texto plano (legacy), luego hash
+        $claveAlmacenada = $user['clave'];
+        $claveValida = ($claveAlmacenada === $password)
+                    || password_verify($password, $claveAlmacenada);
 
         if (!$claveValida) {
             return false;
