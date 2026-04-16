@@ -93,9 +93,8 @@ class Home extends BaseController
 
     public function logout_ci()
     {
-        $this->session->sess_destroy();
-        header("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
-        header("Location: http://localhost/portal/"); /* Redirección del navegador */
+        session()->destroy();
+        return redirect()->to(site_url('/'));
     }
 
 
