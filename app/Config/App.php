@@ -16,10 +16,7 @@ class App extends BaseConfig
    *
    * E.g., http://example.com/
    */
-  // public string $baseURL = 'http://localhost/intranet';
-  // La baseURL se configura en el archivo .env de cada entorno:
-  //   Local:      app.baseURL = 'http://localhost/Portal/'
-  //   Produccion: app.baseURL = 'http://www.prelisto.cl/portal/'
+  // baseURL se detecta automaticamente segun el host del servidor
   public string $baseURL = '';
 
 

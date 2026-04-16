@@ -62,7 +62,7 @@
                                     </div>
                                     <div class="card-body">
 
-      <?php echo form_open(base_url().'home/validaUser', $dataform) ?> 
+      <?php echo form_open(site_url('home/validaUser'), $dataform) ?> 
             <label for="inputEmail" class="sr-only">Usuario</label>
                 <div class="form-floating mb-3">
                     <?php echo form_input($user) ?><p><?php  service('validation')->getError('Usuario') ?>

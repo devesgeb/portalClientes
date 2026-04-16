@@ -51,10 +51,7 @@ $routes->delete('/cuentas-pagar/eliminar', 'BalanceDiario::eliminarPagar');
 // Verificar si N° documento existe en Pagar
 $routes->get('/cuentas-pagar/verificar-documento', 'BalanceDiario::verificarDocumentoPagar');
 
-$routes->get('/home/validaUser', function () {
-    return "GET a validaUser funcionando";
-});
-$routes->post('/home/validaUser', 'Home::validaUser');
+
 
 // ── Panel de Administración
 $routes->get('/admin', 'AdminController::index');
