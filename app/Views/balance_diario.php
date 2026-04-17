@@ -1,4 +1,4 @@
-﻿<?php $activePage = 'balance-diario'; ?>
+<?php $activePage = 'balance-diario'; ?>
 <!DOCTYPE html>
 <html lang="es">
 
@@ -74,10 +74,14 @@
 
         <!-- Top Bar -->
         <div class="topbar">
-            <div>
-                <div class="topbar-title"><i class="bi bi-bar-chart-line me-2" style="color:var(--accent);"></i>Balance
-                    Diario</div>
-                <div class="topbar-sub">Portal Admin &rsaquo; Balance General &rsaquo; Vista del dí­a</div>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn-menu-toggle" onclick="abrirSidebar()" aria-label="Abrir menú">
+                    <i class="bi bi-list"></i>
+                </button>
+                <div>
+                    <div class="topbar-title"><i class="bi bi-bar-chart-line me-2" style="color:var(--accent);"></i>Balance Diario</div>
+                    <div class="topbar-sub">Portal Admin &rsaquo; Balance General &rsaquo; Vista del día</div>
+                </div>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="date-badge"><i class="bi bi-calendar3 me-1"></i><span id="fechaHoy"></span></span>

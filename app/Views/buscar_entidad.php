@@ -62,9 +62,14 @@
 <div class="main">
     <!-- Topbar -->
     <div class="topbar">
-        <div>
-            <div class="topbar-title"><i class="bi bi-search me-2" style="color:var(--accent);"></i>Buscar Cliente / Proveedor</div>
-            <div class="topbar-sub">Portal Admin &rsaquo; Clientes / Proveedores &rsaquo; Buscar</div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn-menu-toggle" onclick="abrirSidebar()" aria-label="Abrir menú">
+                <i class="bi bi-list"></i>
+            </button>
+            <div>
+                <div class="topbar-title"><i class="bi bi-search me-2" style="color:var(--accent);"></i>Buscar Cliente / Proveedor</div>
+                <div class="topbar-sub">Portal Admin &rsaquo; Clientes / Proveedores &rsaquo; Buscar</div>
+            </div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <div class="user-badge">

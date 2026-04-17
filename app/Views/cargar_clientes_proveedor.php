@@ -1,4 +1,4 @@
-﻿﻿<?php $activePage = 'cargar-entidad'; ?>
+﻿<?php $activePage = 'cargar-entidad'; ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -73,11 +73,16 @@
 <div class="main">
     <!-- Topbar -->
     <div class="topbar">
-        <div>
-            <div class="topbar-title">
-                <i class="bi bi-people-fill me-2" style="color:var(--accent);"></i>Cargar Clientes / Proveedores
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn-menu-toggle" onclick="abrirSidebar()" aria-label="Abrir menú">
+                <i class="bi bi-list"></i>
+            </button>
+            <div>
+                <div class="topbar-title">
+                    <i class="bi bi-people-fill me-2" style="color:var(--accent);"></i>Cargar Clientes / Proveedores
+                </div>
+                <div class="topbar-sub">Portal Admin &rsaquo; Clientes / Proveedores &rsaquo; Cargar</div>
             </div>
-            <div class="topbar-sub">Portal Admin &rsaquo; Clientes / Proveedores &rsaquo; Cargar</div>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="date-badge"><i class="bi bi-calendar3 me-1"></i><span id="fechaHoy"></span></span>
