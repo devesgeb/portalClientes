@@ -17,7 +17,7 @@ import subprocess
 FTP_HOST   = "ftp.prelisto.cl"
 FTP_USER   = "portal@prelisto.cl"
 FTP_PASS   = "portal2026***?"
-REMOTE_DIR = "portal_resp"        # carpeta raiz en el hosting (relativa al FTP root)
+REMOTE_DIR = "Portal"             # carpeta raiz en el hosting (relativa al FTP root)
 
 LOCAL_ROOT = os.path.dirname(os.path.abspath(__file__))
 

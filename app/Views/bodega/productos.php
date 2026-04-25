@@ -569,7 +569,7 @@ function renderTabla() {
                         <i class="bi bi-pencil-fill"></i>
                     </button>
                     <button class="btn-accion btn-ver" title="Ver detalle"
-                            onclick="abrirVer('${p.sku}')">
+                            onclick="abrirVer('${p.sku}', '${listaFiltro}')">
                         <i class="bi bi-eye-fill"></i>
                     </button>
                     <button class="btn-accion btn-borrar" title="Eliminar producto"
@@ -654,7 +654,7 @@ async function guardarEdicion() {
 }
 
 // ── MODAL VISUALIZAR ──────────────────────────────────────────
-async function abrirVer(sku) {
+async function abrirVer(sku, listaFiltro) {
     document.getElementById('verSku').textContent = sku;
     document.getElementById('verLoader').style.display    = 'flex';
     document.getElementById('verContenido').style.display = 'none';
@@ -699,14 +699,18 @@ async function abrirVer(sku) {
                 <span class="detail-value">${v}</span>
             </div>`).join('');
 
-        const listas = json.listas || [];
-        document.getElementById('verListas').innerHTML = listas.length
-            ? listas.map(l => `
+        const todasListas = json.listas || [];
+        // Filtrar por la lista activa en el dropdown (si hay una seleccionada)
+        const listasAMostrar = listaFiltro
+            ? todasListas.filter(l => l.lista === listaFiltro)
+            : todasListas;
+        document.getElementById('verListas').innerHTML = listasAMostrar.length
+            ? listasAMostrar.map(l => `
                 <div class="precio-list-row">
                     <span style="font-weight:600;color:#374151;">${l.lista}</span>
                     <span style="color:#059669;font-weight:700;">${fmt(l.precio_total)}</span>
                 </div>`).join('')
-            : '<span style="color:#94a3b8;font-size:.82rem;">Sin listas de precio.</span>';
+            : '<span style="color:#94a3b8;font-size:.82rem;">Sin precio para esta lista.</span>';
 
         document.getElementById('verLoader').style.display    = 'none';
         document.getElementById('verContenido').style.display = 'block';
