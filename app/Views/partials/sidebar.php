@@ -79,13 +79,13 @@ function sbOpenClass(array $g, string $active): string
             <i class="bi bi-chevron-right chevron"></i>
         </button>
         <div class="sub-nav" id="menuBodega" class="sub-nav<?= sbOpenClass($bodegaOpen, $activePage) ?>">
-            <a href="#" class="sub-link<?= sbActive('productos', $activePage) ?>">
+            <a href="<?= site_url('productos') ?>" class="sub-link<?= sbActive('productos', $activePage) ?>">
                 <i class="bi bi-box-seam-fill"></i> Productos
             </a>
             <a href="#" class="sub-link<?= sbActive('maestro-articulos', $activePage) ?>">
                 <i class="bi bi-journal-text"></i> Maestro de artículos
             </a>
-            <a href="#" class="sub-link<?= sbActive('carga-masiva-productos', $activePage) ?>">
+            <a href="<?= site_url('carga-masiva-productos') ?>" class="sub-link<?= sbActive('carga-masiva-productos', $activePage) ?>">
                 <i class="bi bi-file-earmark-arrow-up-fill"></i> Carga masiva de productos
             </a>
             <a href="#" class="sub-link<?= sbActive('reportes-bodega', $activePage) ?>">

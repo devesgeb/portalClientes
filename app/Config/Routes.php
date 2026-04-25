@@ -78,3 +78,16 @@ $routes->delete('/buscar-entidad/eliminar', 'BuscarEntidadController::eliminar')
 // Autocomplete clientes / proveedores
 $routes->get('/clientes/buscar', 'BalanceDiario::buscarClientes');
 $routes->get('/proveedores/buscar', 'BalanceDiario::buscarProveedores');
+
+// ── Bodega ────────────────────────────────────────────────────
+$routes->get('/productos',                         'BodegaController::productos');
+$routes->get('/bodega/lista-productos',            'BodegaController::listarProductos');
+$routes->get('/bodega/producto/(:any)',             'BodegaController::getProducto/$1');
+$routes->patch('/bodega/producto/(:any)',           'BodegaController::actualizarProducto/$1');
+$routes->delete('/bodega/producto/(:any)',          'BodegaController::eliminarProducto/$1');
+$routes->get('/carga-masiva-productos',            'BodegaController::cargaMasiva');
+$routes->post('/bodega/importar-productos',        'BodegaController::importarProductos');
+$routes->post('/bodega/importar-lista-precios',    'BodegaController::importarListaPrecios');
+$routes->get('/bodega/plantilla-productos',        'BodegaController::plantillaProductos');
+$routes->get('/bodega/plantilla-lista-precios',    'BodegaController::plantillaListaPrecios');
+$routes->get('/bodega/stats',                      'BodegaController::stats');
