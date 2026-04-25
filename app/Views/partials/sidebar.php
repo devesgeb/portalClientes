@@ -8,9 +8,10 @@
 $activePage = $activePage ?? 'admin';
 $contabOpen = ['balance-diario', 'gastos', 'pagos-mensuales', 'historial-balances'];
 $cpOpen = ['cargar-entidad', 'buscar-entidad'];
-$bodegaOpen = ['productos', 'maestro-articulos', 'carga-masiva-productos', 'reportes-bodega'];
-$devOpen = ['solicitar-devolucion', 'historial-devoluciones'];
-$adminOpen = ['usuarios', 'cuentas-bancarias', 'datos-empresa', 'sucursales', 'api'];
+$bodegaOpen    = ['productos', 'carga-masiva-productos'];
+$logisticaOpen = ['hoja-de-ruta'];
+$devOpen       = ['solicitar-devolucion', 'historial-devoluciones'];
+$adminOpen     = ['usuarios', 'cuentas-bancarias', 'datos-empresa', 'sucursales', 'api'];
 
 function sbActive(string $p, string $active): string
 {
@@ -82,14 +83,20 @@ function sbOpenClass(array $g, string $active): string
             <a href="<?= site_url('productos') ?>" class="sub-link<?= sbActive('productos', $activePage) ?>">
                 <i class="bi bi-box-seam-fill"></i> Productos
             </a>
-            <a href="#" class="sub-link<?= sbActive('maestro-articulos', $activePage) ?>">
-                <i class="bi bi-journal-text"></i> Maestro de artículos
-            </a>
             <a href="<?= site_url('carga-masiva-productos') ?>" class="sub-link<?= sbActive('carga-masiva-productos', $activePage) ?>">
                 <i class="bi bi-file-earmark-arrow-up-fill"></i> Carga masiva de productos
             </a>
-            <a href="#" class="sub-link<?= sbActive('reportes-bodega', $activePage) ?>">
-                <i class="bi bi-graph-up"></i> Reportes
+        </div>
+
+        <div class="nav-sec">Logística</div>
+        <button class="s-parent<?= sbOpen($logisticaOpen, $activePage) ?>" onclick="toggleMenu('menuLogistica')"
+            id="parentLogistica">
+            <i class="bi bi-truck"></i><span>Logística</span>
+            <i class="bi bi-chevron-right chevron"></i>
+        </button>
+        <div class="sub-nav" id="menuLogistica" class="sub-nav<?= sbOpenClass($logisticaOpen, $activePage) ?>">
+            <a href="#" class="sub-link<?= sbActive('hoja-de-ruta', $activePage) ?>">
+                <i class="bi bi-map-fill"></i> Hoja de ruta
             </a>
         </div>
 
@@ -175,6 +182,7 @@ function sbOpenClass(array $g, string $active): string
             menuCP: <?= json_encode($cpOpen) ?>,
             menuContab: <?= json_encode($contabOpen) ?>,
             menuBodega: <?= json_encode($bodegaOpen) ?>,
+            menuLogistica: <?= json_encode($logisticaOpen) ?>,
             menuDev: <?= json_encode($devOpen) ?>,
             menuAdmin: <?= json_encode($adminOpen) ?>
         };
