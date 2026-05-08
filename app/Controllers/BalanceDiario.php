@@ -381,6 +381,33 @@ class BalanceDiario extends BaseController
     }
 
     /**
+     * GET /inventario/productos
+     * Devuelve todos los productos activos con precio_con_iva = costo_neto * 1.19
+     */
+    public function inventarioProductos(): ResponseInterface
+    {
+        $db = \Config\Database::connect();
+        $rows = $db->query("
+            SELECT
+                p.sku,
+                p.nombre,
+                p.categoria,
+                p.marca,
+                p.costo_neto,
+                ROUND(p.costo_neto * 1.19, 0)          AS precio_con_iva,
+                ROUND(p.costo_neto * 0.19, 0)           AS monto_iva,
+                p.stock_bodega_ppral                    AS stock,
+                p.stock_reservado,
+                ROUND(p.costo_neto * 1.19 * p.stock_bodega_ppral, 0) AS total
+            FROM tbl_productos p
+            WHERE p.activo = 1
+            ORDER BY p.nombre ASC
+        ")->getResultArray();
+
+        return $this->response->setJSON(['success' => true, 'data' => $rows]);
+    }
+
+    /**
      * GET /proveedores/buscar?q=texto
      */
     public function buscarProveedores(): ResponseInterface

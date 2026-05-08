@@ -9,7 +9,7 @@ $activePage = $activePage ?? 'admin';
 $contabOpen = ['balance-diario', 'gastos', 'pagos-mensuales', 'historial-balances'];
 $cpOpen = ['cargar-entidad', 'buscar-entidad'];
 $bodegaOpen    = ['productos', 'carga-masiva-productos'];
-$logisticaOpen = ['hoja-de-ruta'];
+$logisticaOpen = ['hoja-de-ruta', 'despachos-agendados', 'funcionarios'];
 $devOpen       = ['solicitar-devolucion', 'historial-devoluciones'];
 $adminOpen     = ['usuarios', 'cuentas-bancarias', 'datos-empresa', 'sucursales', 'api'];
 
@@ -95,8 +95,14 @@ function sbOpenClass(array $g, string $active): string
             <i class="bi bi-chevron-right chevron"></i>
         </button>
         <div class="sub-nav" id="menuLogistica" class="sub-nav<?= sbOpenClass($logisticaOpen, $activePage) ?>">
-            <a href="#" class="sub-link<?= sbActive('hoja-de-ruta', $activePage) ?>">
+            <a href="<?= site_url('hoja-de-ruta') ?>" class="sub-link<?= sbActive('hoja-de-ruta', $activePage) ?>">
                 <i class="bi bi-map-fill"></i> Hoja de ruta
+            </a>
+            <a href="<?= site_url('despachos-agendados') ?>" class="sub-link<?= sbActive('despachos-agendados', $activePage) ?>">
+                <i class="bi bi-calendar-event-fill"></i> Despachos agendados
+            </a>
+            <a href="<?= site_url('funcionarios') ?>" class="sub-link<?= sbActive('funcionarios', $activePage) ?>">
+                <i class="bi bi-people-fill"></i> Funcionarios
             </a>
         </div>
 

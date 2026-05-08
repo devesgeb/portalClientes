@@ -203,9 +203,9 @@
                     </div>
                 </div>
 
-                <!-- â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                 â”‚  COL 2 â€“ CAJA / INVENTARIO                â”‚
-                 â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ -->
+                <!-- ┌────────────────────────────────────────────────┐
+                 │  COL 2 – CAJA / INVENTARIO                │
+                 └────────────────────────────────────────────────┘ -->
                 <div class="col-xl-4 col-lg-12">
                     <div class="panel">
                         <!-- Header -->
@@ -213,9 +213,17 @@
                             <div class="ph-title"><i class="bi bi-box-seam-fill"></i>Caja / Inventario</div>
                             <button class="btn btn-sm"
                                 style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
-                                onclick="addCajaRow()">
-                                <i class="bi bi-plus-lg me-1"></i>Agregar item
+                                onclick="recargarInventario()" title="Actualizar desde BD">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
                             </button>
+                        </div>
+
+                        <!-- Input búsqueda rápida -->
+                        <div style="padding:8px 12px;border-bottom:1px solid #f0f4f9;">
+                            <input type="text" id="cajaBusqueda" class="form-control form-control-sm"
+                                placeholder="🔍 Filtrar producto..."
+                                oninput="filtrarCaja(this.value)"
+                                style="font-size:.76rem;border-color:#e2e8f0;border-radius:8px;">
                         </div>
 
                         <!-- Table -->
@@ -223,49 +231,19 @@
                             <table class="tbl table table-borderless" id="tblCaja">
                                 <thead>
                                     <tr>
-                                        <th>Descripción / SKU</th>
+                                        <th>Descripción</th>
                                         <th class="text-end">Precio</th>
                                         <th class="text-end">Stock</th>
-                                        <th class="text-end">Monto</th>
-                                        <th class="text-center" style="width:64px;">+/-</th>
+                                        <th class="text-end">Total</th>
+                                        <th class="text-center" style="width:80px;">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="bodyCaja">
-                                    <!-- rows injected by JS -->
+                                    <tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;font-size:.80rem;">
+                                        <span class="spinner-border spinner-border-sm me-2"></span>Cargando inventario...
+                                    </td></tr>
                                 </tbody>
                             </table>
-                        </div>
-
-                        <!-- Add row inline form -->
-                        <div class="add-row-form" id="formCaja" style="display:none;">
-                            <div class="row g-2 align-items-end">
-                                <div class="col-4">
-                                    <label style="font-size:.68rem;color:#8fa3bc;font-weight:600;">SKU / Desc.</label>
-                                    <input class="form-control form-control-sm" id="cajaSku" placeholder="Producto A">
-                                </div>
-                                <div class="col-3">
-                                    <label style="font-size:.68rem;color:#8fa3bc;font-weight:600;">Precio</label>
-                                    <input class="form-control form-control-sm" id="cajaPrecio" type="number"
-                                        placeholder="0">
-                                </div>
-                                <div class="col-2">
-                                    <label style="font-size:.68rem;color:#8fa3bc;font-weight:600;">Stock</label>
-                                    <input class="form-control form-control-sm" id="cajaStock" type="number"
-                                        placeholder="0">
-                                </div>
-                                <div class="col-3 d-flex gap-1">
-                                    <button class="btn btn-sm flex-grow-1"
-                                        style="background:var(--caja-head);color:#fff;border-radius:7px;font-size:.72rem;"
-                                        onclick="confirmarCajaRow()">
-                                        <i class="bi bi-check-lg"></i> OK
-                                    </button>
-                                    <button class="btn btn-sm"
-                                        style="background:#f0f4f9;color:#5a7394;border-radius:7px;"
-                                        onclick="cancelarCajaRow()">
-                                        <i class="bi bi-x"></i>
-                                    </button>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Total -->
@@ -276,9 +254,9 @@
                     </div>
                 </div>
 
-                <!-- â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-                 â”‚  COL 3 â€“ CUENTAS POR PAGAR                â”‚
-                 â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ -->
+                <!-- ┌────────────────────────────────────────────────┐
+                 │  COL 3 – CUENTAS POR PAGAR                │
+                 └────────────────────────────────────────────────┘ -->
                 <div class="col-xl-4 col-lg-12">
                     <div class="panel">
                         <!-- Header -->
@@ -334,9 +312,68 @@
     </div><!-- /page-body -->
     </div><!-- /main -->
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-     MODAL â€“ Agregar / Editar Cobrar & Pagar
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══════════════════════════════════════════
+     MODAL – Visualizar Producto Inventario
+═══════════════════════════════════════════ -->
+    <div class="modal fade" id="modalVerProducto" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;box-shadow:0 20px 60px rgba(0,0,0,.18);">
+                <div class="modal-header py-3" style="background:var(--caja-head);">
+                    <h6 class="modal-title text-white"><i class="bi bi-box-seam-fill me-2"></i>Detalle del Producto</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+                </div>
+                <div class="modal-body p-4" id="verProductoBody"></div>
+                <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
+                    <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+     MODAL – Editar Stock Producto Inventario
+═══════════════════════════════════════════ -->
+    <div class="modal fade" id="modalEditarProducto" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+            <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;">
+                <div class="modal-header py-3" style="background:var(--caja-head);">
+                    <h6 class="modal-title text-white"><i class="bi bi-pencil-square me-2"></i>Editar Producto</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" id="editProdSku">
+                    <div class="mb-3">
+                        <label style="font-size:.76rem;font-weight:600;color:#5a7394;">Producto</label>
+                        <div id="editProdNombre" style="font-size:.88rem;font-weight:700;color:#1a2940;padding:6px 0;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label style="font-size:.76rem;font-weight:600;color:#5a7394;">SKU</label>
+                        <div id="editProdSkuLabel" style="font-size:.80rem;color:#64748b;padding:4px 0;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label style="font-size:.76rem;font-weight:600;color:#5a7394;">Precio (IVA incluido)</label>
+                        <div id="editProdPrecio" style="font-size:.88rem;font-weight:700;color:#0891b2;padding:6px 0;"></div>
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label" style="font-size:.76rem;font-weight:600;color:#5a7394;">Stock en bodega</label>
+                        <input type="number" class="form-control form-control-sm" id="editProdStock" min="0" step="1">
+                        <div class="form-text" style="font-size:.70rem;color:#94a3b8;">Solo edición visual local — no modifica la BD de productos.</div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
+                    <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-sm" onclick="guardarEdicionProducto()"
+                        style="background:var(--caja-head);color:#fff;border-radius:8px;font-weight:600;">
+                        <i class="bi bi-check-lg me-1"></i>Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MODAL – Agregar / Editar Cobrar & Pagar
+    ═══════════════════════════════════════════ -->
     <div class="modal fade" id="modalRegistro" tabindex="-1">
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content" style="border-radius:14px;">
@@ -473,7 +510,7 @@
         </div>
     </div>
 
-    <!-- MODAL â€“ Detalle -->
+    <!-- MODAL – Detalle -->
     <div class="modal fade" id="modalDetalle" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content" style="border-radius:14px;">
@@ -490,15 +527,15 @@
         </div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-         MODAL â€“ Carga Masiva Excel Cobrar
-    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ══════════════════════════════════════════
+         MODAL – Carga Masiva Excel Cobrar
+    ═══════════════════════════════════════════ -->
     <div class="modal fade" id="modalExcel" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content" style="border-radius:14px;">
                 <div class="modal-header py-3" style="background:#16a34a;">
                     <h6 class="modal-title text-white">
-                        <i class="bi bi-file-earmark-excel-fill me-2"></i>Carga Masiva â€“ Cuentas por Cobrar
+                        <i class="bi bi-file-earmark-excel-fill me-2"></i>Carga Masiva – Cuentas por Cobrar
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
                 </div>
@@ -540,8 +577,8 @@
                         ondragleave="dragLeave(event)" ondrop="dropFile(event)">
                         <i class="bi bi-cloud-upload" style="font-size:2.5rem;color:#22c55e;"></i>
                         <div style="font-size:.90rem;font-weight:600;color:#15803d;margin-top:8px;">Arrastra tu archivo
-                            Excel aquÃ­</div>
-                        <div style="font-size:.76rem;color:#6b7280;margin-top:4px;">o haz clic para seleccionar â€“
+                            Excel aquí</div>
+                        <div style="font-size:.76rem;color:#6b7280;margin-top:4px;">o haz clic para seleccionar –
                             .xlsx,
                             .xls</div>
                         <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none;"
@@ -559,7 +596,7 @@
                     <div id="excelPreviewWrapper" style="display:none;margin-top:20px;">
                         <div style="font-size:.82rem;font-weight:600;color:#1a2940;margin-bottom:8px;">
                             <i class="bi bi-eye me-1" style="color:#16a34a;"></i>
-                            Vista previa â€” <span id="excelResumenCount"></span>
+                            Vista previa — <span id="excelResumenCount"></span>
                         </div>
 
                         <!-- Tabs: resumen | detalle -->
@@ -615,7 +652,7 @@
                                                 Fecha</th>
                                             <th
                                                 style="padding:8px 12px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;">
-                                                NÂ° Doc.</th>
+                                                N° Doc.</th>
                                             <th
                                                 style="padding:8px 12px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;">
                                                 Cliente</th>

@@ -78,8 +78,23 @@ $routes->delete('/buscar-entidad/eliminar', 'BuscarEntidadController::eliminar')
 // Autocomplete clientes / proveedores
 $routes->get('/clientes/buscar', 'BalanceDiario::buscarClientes');
 $routes->get('/proveedores/buscar', 'BalanceDiario::buscarProveedores');
+$routes->get('/inventario/productos', 'BalanceDiario::inventarioProductos');
 
-// ── Bodega ────────────────────────────────────────────────────
+// ── Logística ──────────────────────────────────────────────────
+$routes->get('/hoja-de-ruta',          'LogisticaController::hojaDeRuta');
+$routes->get('/despachos-agendados',   'LogisticaController::despachosAgendados');
+$routes->get('/funcionarios',          'LogisticaController::funcionarios');
+$routes->get('/logistica/clientes',    'LogisticaController::clientes');
+
+// API Funcionarios
+$routes->get('/logistica/api/funcionarios',                   'LogisticaController::apiFuncionarios');
+$routes->post('/logistica/api/funcionarios',                  'LogisticaController::crearFuncionario');
+$routes->put('/logistica/api/funcionarios/(:num)',            'LogisticaController::actualizarFuncionario/$1');
+$routes->delete('/logistica/api/funcionarios/(:num)',         'LogisticaController::eliminarFuncionario/$1');
+$routes->get('/logistica/api/funcionarios/(:num)/eventos',   'LogisticaController::apiEventos/$1');
+$routes->post('/logistica/api/funcionarios/(:num)/eventos',  'LogisticaController::crearEvento/$1');
+$routes->delete('/logistica/api/eventos/(:num)',              'LogisticaController::eliminarEvento/$1');
+
 $routes->get('/productos',                         'BodegaController::productos');
 $routes->get('/bodega/lista-productos',            'BodegaController::listarProductos');
 $routes->get('/bodega/producto/(:any)',             'BodegaController::getProducto/$1');
