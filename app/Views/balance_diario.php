@@ -427,6 +427,7 @@
                                         <option value="">Seleccionar...</option>
                                         <option value="Factura">Factura</option>
                                         <option value="Boleta">Boleta</option>
+                                        <option value="Guía de despacho electrónica">Guía de despacho electrónica</option>
                                         <option value="N/A">N/A</option>
                                     </select>
                                 </div>
