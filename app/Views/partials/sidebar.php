@@ -106,19 +106,7 @@ function sbOpenClass(array $g, string $active): string
             </a>
         </div>
 
-        <div class="nav-sec">Devoluciones</div>
-        <button class="s-parent<?= sbOpen($devOpen, $activePage) ?>" onclick="toggleMenu('menuDev')" id="parentDev">
-            <i class="bi bi-arrow-return-left"></i><span>Devoluciones</span>
-            <i class="bi bi-chevron-right chevron"></i>
-        </button>
-        <div class="sub-nav" id="menuDev" class="sub-nav<?= sbOpenClass($devOpen, $activePage) ?>">
-            <a href="#" class="sub-link<?= sbActive('solicitar-devolucion', $activePage) ?>">
-                <i class="bi bi-send-check"></i> Solicitar devolución
-            </a>
-            <a href="#" class="sub-link<?= sbActive('historial-devoluciones', $activePage) ?>">
-                <i class="bi bi-archive"></i> Historial de devoluciones
-            </a>
-        </div>
+
 
         <div class="nav-sec">Administración</div>
         <button class="s-parent<?= sbOpen($adminOpen, $activePage) ?>" onclick="toggleMenu('menuAdmin')"
