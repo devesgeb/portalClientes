@@ -34,8 +34,9 @@ $routes->get('/test', function () {
 $routes->get('/home', 'Home::index');
 $routes->get('/home/index', 'Home::index');
 
-// ── Balance Diario
+// ── Balance Diario & Contabilidad
 $routes->get('/balance-diario', 'BalanceDiario::index');
+$routes->get('/historial-balances', 'ContabilidadController::historialBalances');
 
 // ── Cuentas por Cobrar (API JSON)
 $routes->get('/cuentas-cobrar/pendientes', 'BalanceDiario::pendientesCobrar');

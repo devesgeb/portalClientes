@@ -62,13 +62,7 @@ function sbOpenClass(array $g, string $active): string
             <a href="<?= site_url('balance-diario') ?>" class="sub-link<?= sbActive('balance-diario', $activePage) ?>">
                 <i class="bi bi-bar-chart-line-fill"></i> Balance diario
             </a>
-            <a href="#" class="sub-link<?= sbActive('gastos', $activePage) ?>">
-                <i class="bi bi-receipt-cutoff"></i> Registro de gastos diarios
-            </a>
-            <a href="#" class="sub-link<?= sbActive('pagos-mensuales', $activePage) ?>">
-                <i class="bi bi-calendar-check-fill"></i> Pagos mensuales
-            </a>
-            <a href="#" class="sub-link<?= sbActive('historial-balances', $activePage) ?>">
+            <a href="<?= site_url('historial-balances') ?>" class="sub-link<?= sbActive('historial-balances', $activePage) ?>">
                 <i class="bi bi-clock-history"></i> Historial de balances
             </a>
         </div>
