@@ -742,9 +742,9 @@ window.DocumentosModule = (function () {
                     const key = rut ? `${nombre}||${rut}` : nombre;
                     if (!grupos[key]) grupos[key] = { nombre, rut, docs: [], impago: 0, pagado: 0 };
 
-                    const impago = colMap.impago ? parseNum(row[colMap.impago]) : 0;
-                    const pagado = colMap.pagado ? parseNum(row[colMap.pagado]) : 0;
-                    let total    = colMap.total ? parseNum(row[colMap.total]) : 0;
+                    let impago = colMap.impago ? parseNum(row[colMap.impago]) : 0;
+                    let pagado = colMap.pagado ? parseNum(row[colMap.pagado]) : 0;
+                    let total  = colMap.total ? parseNum(row[colMap.total]) : 0;
 
                     if (total === 0 && (impago > 0 || pagado > 0)) {
                         total = impago + pagado;
