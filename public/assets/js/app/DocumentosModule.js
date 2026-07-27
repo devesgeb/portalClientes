@@ -394,23 +394,32 @@ window.DocumentosModule = (function () {
     // ─────────────────────────────────────────────────────────────────────
     //  DETALLE — AGREGAR / ELIMINAR DOC
     // ─────────────────────────────────────────────────────────────────────
-    function eliminarDocDetalle(cfg, entidadId, docIdx) {
+    async function eliminarDocDetalle(cfg, entidadId, docIdx) {
         const db = cfg.db();
         const r = db.find(x => x.id === entidadId);
         if (!r || !r.docs) return;
 
         if (r.docs.length <= 1) {
-            PortalApp.toast(`No puedes eliminar el único documento. Usa el botón eliminar del ${cfg.label.toLowerCase()}.`, 'warning');
+            _eliminarPendiente = { cfg, id: entidadId };
+            const modalDet = document.getElementById(cfg.modalDetalle);
+            if (modalDet) PortalApp.hideModal(cfg.modalDetalle);
+            eliminar(cfg, entidadId);
             return;
         }
 
         r.docs.splice(docIdx, 1);
-        r.monto = r.docs.reduce((s, d) => s + (d.monto ?? d.total ?? 0), 0);
+        r.monto = r.docs.reduce((s, d) => s + (d.impago ?? d.monto ?? d.total ?? 0), 0);
 
         const body = document.getElementById(cfg.detalleBody);
         _renderDetalleBody(cfg, entidadId, body);
         renderTabla(cfg);
-        PortalApp.toast('Documento eliminado. Recuerda presionar Guardar en BD.', 'warning');
+
+        // Guardar automáticamente en BD para que la eliminación persista en la base de datos
+        if (r.enBD) {
+            await guardarEnBD(cfg);
+        } else {
+            PortalApp.toast('Documento eliminado de la vista local.', 'info');
+        }
     }
 
     function agregarDocDetalle(cfg, entidadId) {
