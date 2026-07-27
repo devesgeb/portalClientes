@@ -825,22 +825,57 @@ window.DocumentosModule = (function () {
     function importarExcel(cfg) {
         const agrupado = _excelData[cfg.tipo] || [];
         if (!agrupado.length) return;
-        const db = cfg.db();
+        let currentDb = [...cfg.db()];
+
         agrupado.forEach(c => {
-            const existing = db.find(r => (r.rut || '').toLowerCase() === (c.rut || '').toLowerCase() && c.rut);
+            const normRut  = (c.rut || '').replace(/[^0-9kK]/g, '').toLowerCase();
+            const normName = (c.nombre || '').trim().toLowerCase();
+
+            let existing = currentDb.find(r => {
+                const rRut  = (r.rut || '').replace(/[^0-9kK]/g, '').toLowerCase();
+                const rName = (r.nombre || r.cliente || r.proveedor || '').trim().toLowerCase();
+                return (normRut && rRut === normRut) || (normName && rName === normName);
+            });
+
             if (existing) {
-                existing.docs = [...(existing.docs || []), ...c.docs];
-                existing.monto += c.monto;
+                if (!existing.docs) existing.docs = [];
+                c.docs.forEach(newDoc => {
+                    const newNro  = String(newDoc.nro || newDoc.numero || '').trim();
+                    const newTipo = String(newDoc.tipo || newDoc.tipo_documento || '').trim().toLowerCase();
+
+                    const docIdx = existing.docs.findIndex(d => {
+                        const dNro  = String(d.nro || d.numero || '').trim();
+                        const dTipo = String(d.tipo || d.tipo_documento || '').trim().toLowerCase();
+                        return (newNro !== '' && dNro === newNro) && (dTipo === newTipo || !newTipo || !dTipo);
+                    });
+
+                    if (docIdx !== -1) {
+                        // Reemplazar documento existente para evitar duplicados
+                        existing.docs[docIdx] = newDoc;
+                    } else {
+                        // Agregar nuevo documento sin duplicar
+                        existing.docs.push(newDoc);
+                    }
+                });
+                existing.monto = existing.docs.reduce((s, d) => s + (d.impago ?? d.monto ?? d.total ?? 0), 0);
             } else {
-                cfg.setDb([...cfg.db(), {
-                    id: cfg.incId(), nombre: c.nombre, cliente: c.nombre, proveedor: c.nombre,
-                    rut: c.rut, monto: c.monto, docs: c.docs, enBD: false,
-                }]);
+                currentDb.push({
+                    id: cfg.incId(),
+                    nombre: c.nombre,
+                    cliente: c.nombre,
+                    proveedor: c.nombre,
+                    rut: c.rut,
+                    monto: c.docs.reduce((s, d) => s + (d.impago ?? d.monto ?? d.total ?? 0), 0),
+                    docs: [...c.docs],
+                    enBD: false,
+                });
             }
         });
+
+        cfg.setDb(currentDb);
         renderTabla(cfg);
         PortalApp.hideModal(cfg.modalExcel);
-        PortalApp.toast(`Importados: ${agrupado.length} ${cfg.labelPlural}, ${agrupado.reduce((s, c) => s + c.docs.length, 0)} documentos`, 'success');
+        PortalApp.toast(`Importación completada sin duplicar registros.`, 'success');
         _limpiarExcel(cfg);
     }
 
