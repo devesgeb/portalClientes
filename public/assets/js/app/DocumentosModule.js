@@ -862,7 +862,7 @@ window.DocumentosModule = (function () {
         return String(s).trim().toLowerCase();
     }
 
-    function importarExcel(cfg) {
+    async function importarExcel(cfg) {
         const agrupado = _excelData[cfg.tipo] || [];
         if (!agrupado.length) return;
         let currentDb = [...cfg.db()];
@@ -943,12 +943,12 @@ window.DocumentosModule = (function () {
             }
         });
 
-        currentDb = currentDb.filter(r => r.docs && r.docs.length > 0);
-
         cfg.setDb(currentDb);
         renderTabla(cfg);
         PortalApp.hideModal(cfg.modalExcel);
-        PortalApp.toast(`Importación completada. Se eliminaron folios duplicados.`, 'success');
+
+        // Guardar y actualizar inmediatamente la información en la Base de Datos MySQL
+        await guardarEnBD(cfg);
         _limpiarExcel(cfg);
     }
 
