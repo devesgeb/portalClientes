@@ -289,11 +289,7 @@
                 const totalCount = res.pagination ? res.pagination.count : res.data.length;
                 document.getElementById('statTotalCount').textContent = totalCount;
                 
-                let montoTotal = 0;
-                
                 tbody.innerHTML = res.data.map(d => {
-                    montoTotal += parseFloat(d.saldo_pendiente);
-                    
                     const totalFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.total);
                     const saldoFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.saldo_pendiente);
                     
@@ -318,6 +314,7 @@
                     </tr>`;
                 }).join('');
                 
+                const montoTotal = res.total_monto !== undefined ? res.total_monto : res.data.reduce((s, d) => s + parseFloat(d.saldo_pendiente || 0), 0);
                 document.getElementById('statTotalMonto').textContent = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(montoTotal);
 
                 // Renderizar Paginación
