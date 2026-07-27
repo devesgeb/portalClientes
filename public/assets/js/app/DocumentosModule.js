@@ -650,19 +650,28 @@ window.DocumentosModule = (function () {
                 };
                 const allRegex = Object.values(patterns).map(p => p.regex);
 
-                let headerRowIdx = 0, maxMatches = 0;
-                const scanLimit = Math.min(rawData.length, 15);
+                let headerRowIdx = 0, maxMatches = -1;
+                const scanLimit = Math.min(rawData.length, 25);
                 for (let i = 0; i < scanLimit; i++) {
-                    const hits = rawData[i].map(c => String(c).trim()).filter(cell => allRegex.some(rx => rx.test(cell))).length;
+                    if (!Array.isArray(rawData[i])) continue;
+                    const hits = rawData[i].map(c => (c !== null && c !== undefined) ? String(c).trim() : '').filter(cell => cell && allRegex.some(rx => rx.test(cell))).length;
                     if (hits > maxMatches) { maxMatches = hits; headerRowIdx = i; }
                 }
 
-                const headers = rawData[headerRowIdx].map(h => String(h).trim());
-                const rows = rawData.slice(headerRowIdx + 1)
-                    .map(row => { const obj = {}; headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; }); return obj; })
-                    .filter(row => Object.values(row).some(v => String(v).trim() !== ''));
+                const rawHeaderRow = Array.isArray(rawData[headerRowIdx]) ? rawData[headerRowIdx] : [];
+                const headers = rawHeaderRow.map(h => (h !== null && h !== undefined) ? String(h).trim() : '');
 
-                if (!rows.length) { PortalApp.toast('Sin filas de datos válidas', 'warning'); return; }
+                const rows = rawData.slice(headerRowIdx + 1)
+                    .map(row => {
+                        const obj = {};
+                        if (Array.isArray(row)) {
+                            headers.forEach((h, i) => { if (h) obj[h] = row[i] !== undefined ? row[i] : ''; });
+                        }
+                        return obj;
+                    })
+                    .filter(row => Object.values(row).some(v => v !== null && v !== undefined && String(v).trim() !== ''));
+
+                if (!rows.length) { PortalApp.toast('Sin filas de datos válidas en el archivo', 'warning'); return; }
 
                 const colMap = {};
                 headers.filter(h => h).forEach(k => {
@@ -671,9 +680,12 @@ window.DocumentosModule = (function () {
                     });
                 });
 
+                // Fallbacks inteligentes si alguna columna no calzó exacto con la Regex
                 if (!colMap.emisor) {
-                    PortalApp.toast(`Columna requerida no encontrada: "Emisor / Receptor". Columnas detectadas: ${headers.join(', ')}`, 'danger');
-                    return;
+                    colMap.emisor = headers.find(h => /cliente|nombre|razon|emisor|receptor|proveedor|empresa/i.test(h)) || headers.find(h => h.length > 0);
+                }
+                if (!colMap.impago && !colMap.total) {
+                    colMap.impago = headers.find(h => /impago|saldo|deuda|monto|total/i.test(h));
                 }
 
                 const parseNum = v => {
