@@ -646,7 +646,7 @@ window.DocumentosModule = (function () {
                 const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                 if (!rawData.length || rawData.length < 2) { PortalApp.toast('Archivo vacío', 'warning'); return; }
 
-                // Columnas requeridas: Tipo Documento | Numero | Emisor/Receptor | Rut | Fecha | Total | Pagado | Impago
+                // Columnas requeridas: Tipo Documento | Numero | Emisor/Receptor | Rut | Fecha | Total | Pagado | Impago | Estado
                 const patterns = {
                     emisor: { regex: /emisor.{0,3}receptor|empresa|razon.?social|cliente|proveedor|receptor|emisor|nombre/i },
                     tipo:   { regex: /tipo.{0,4}doc|tipo/i },
@@ -656,6 +656,7 @@ window.DocumentosModule = (function () {
                     total:  { regex: /total|monto.?total|monto|valor|monto.?doc/i },
                     pagado: { regex: /pagado|monto.?pagado|abono/i },
                     impago: { regex: /impago|saldo.?pendiente|monto.?impago|saldo|deuda|pendiente/i },
+                    estado: { regex: /estado|condici[oó]n|situaci[oó]n/i },
                 };
                 const allRegex = Object.values(patterns).map(p => p.regex);
 
@@ -749,18 +750,32 @@ window.DocumentosModule = (function () {
                     if (!nombre) return;
                     const rut = colMap.rut ? String(row[colMap.rut]).trim() : '';
                     const key = rut ? `${nombre}||${rut}` : nombre;
-                    if (!grupos[key]) grupos[key] = { nombre, rut, docs: [], impago: 0, pagado: 0 };
 
                     let impago = colMap.impago ? parseNum(row[colMap.impago]) : 0;
                     let pagado = colMap.pagado ? parseNum(row[colMap.pagado]) : 0;
                     let total  = colMap.total ? parseNum(row[colMap.total]) : 0;
+                    const estadoStr = colMap.estado ? String(row[colMap.estado]).trim().toLowerCase() : '';
 
-                    if (total === 0 && (impago > 0 || pagado > 0)) {
-                        total = impago + pagado;
+                    // Si el estado indica que está pagada / conciliada / cancelada:
+                    const esPagadoPorEstado = /pagad|conciliad|cancelad|al d[ií]a/.test(estadoStr);
+
+                    if (esPagadoPorEstado) {
+                        impago = 0;
+                        if (total > 0 && pagado === 0) pagado = total;
+                    } else {
+                        if (impago === 0 && pagado > 0 && total > pagado) {
+                            impago = total - pagado;
+                        } else if (impago === 0 && pagado === 0 && colMap.total && !colMap.impago && !colMap.pagado) {
+                            impago = total;
+                        }
                     }
-                    if (impago === 0 && total > 0 && pagado === 0) {
-                        impago = total;
+
+                    // Ignorar documentos que estén completamente pagados (impago <= 0)
+                    if (impago <= 0 && (pagado >= total || esPagadoPorEstado || colMap.impago)) {
+                        return; // Omitir documentos ya pagados
                     }
+
+                    if (!grupos[key]) grupos[key] = { nombre, rut, docs: [], impago: 0, pagado: 0 };
                     const fecha = colMap.fecha ? parseFecha(row[colMap.fecha]) : '—';
                     const tipo = colMap.tipo ? String(row[colMap.tipo]).trim() : '—';
                     const nro = colMap.nro ? String(row[colMap.nro]).trim() : '—';
