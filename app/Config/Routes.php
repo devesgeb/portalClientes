@@ -96,9 +96,11 @@ $routes->delete('/webhook-test/logs', 'WebhookReceiver::clearLogs');
 $routes->post('/webhook/tupana', 'WebhookReceiver::receive');
 
 // ── Cobranza ──────────────────────────────────────────────────
-$routes->get('/cobranza/documentos-impago', 'WebhookReceiver::documentosImpago');
-$routes->get('/cobranza/facturas-facto',    'FactoController::facturasFacto');
-$routes->get('/cobranza/facto/buscar-dtes',  'FactoController::buscarDtes');
+$routes->get('/cobranza/documentos-impago',          'WebhookReceiver::documentosImpago');
+$routes->get('/cobranza/facturas-facto',             'FactoController::facturasFacto');
+$routes->get('/cobranza/facto/buscar-dtes',           'FactoController::buscarDtes');
+$routes->post('/cobranza/facto/actualizar-estado-pago', 'FactoController::actualizarEstadoPago');
+$routes->post('/cobranza/facto/actualizar-estado-masivo', 'FactoController::actualizarEstadoMasivo');
 
 // ── Logística ──────────────────────────────────────────────────
 $routes->get('/hoja-de-ruta',          'LogisticaController::hojaDeRuta');

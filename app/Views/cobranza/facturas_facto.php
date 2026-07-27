@@ -59,6 +59,35 @@
             margin-bottom: 24px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
         }
+        .status-select {
+            font-size: 0.78rem;
+            font-weight: 600;
+            border-radius: 8px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .status-select.pagada {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .status-select.pendiente {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .status-select.parcial {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+        .bulk-bar {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px 18px;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body>
@@ -163,14 +192,23 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label text-slate-600 fw-medium" style="font-size:0.78rem;">Fecha Desde</label>
+                    <label class="form-label text-slate-600 fw-medium" style="font-size:0.78rem;">Estado de Pago</label>
+                    <select class="form-select form-select-sm" id="filterEstadoPago">
+                        <option value="">Todos los Estados</option>
+                        <option value="pendiente">🔴 Pendientes</option>
+                        <option value="pagada">🟢 Pagadas</option>
+                        <option value="parcial">🟡 Parciales</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label text-slate-600 fw-medium" style="font-size:0.78rem;">Desde</label>
                     <input type="date" class="form-control form-control-sm" id="filterFechaInicio">
                 </div>
-                <div class="col-md-2">
-                    <label class="form-label text-slate-600 fw-medium" style="font-size:0.78rem;">Fecha Hasta</label>
+                <div class="col-md-1">
+                    <label class="form-label text-slate-600 fw-medium" style="font-size:0.78rem;">Hasta</label>
                     <input type="date" class="form-control form-control-sm" id="filterFechaFin">
                 </div>
-                <div class="col-md-1 d-flex gap-2">
+                <div class="col-md-1 d-flex gap-1">
                     <button type="button" class="btn btn-sm btn-primary w-100 py-2 fw-semibold" onclick="buscarDocumentos()" title="Buscar">
                         <i class="bi bi-search me-1"></i> Buscar
                     </button>
@@ -179,6 +217,25 @@
                     </button>
                 </div>
             </form>
+        </div>
+
+        <!-- Barra de Acciones Masivas (Combo Box en la parte superior) -->
+        <div id="bulkActionsBar" class="bulk-bar d-flex align-items-center justify-content-between shadow-sm" style="display: none !important;">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-check-square-fill text-primary" style="font-size: 1.2rem;"></i>
+                <span class="fw-bold text-slate-700" style="font-size: 0.88rem;" id="selectedCountText">0 documentos seleccionados</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 text-slate-600 fw-medium" style="font-size: 0.8rem;">Marcar seleccionadas como:</label>
+                <select id="bulkEstadoSelect" class="form-select form-select-sm" style="width: 190px;">
+                    <option value="pagada">🟢 Pagada</option>
+                    <option value="pendiente">🔴 Pendiente</option>
+                    <option value="parcial">🟡 Pago Parcial</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-success px-3 fw-semibold py-1.5" onclick="aplicarAccionMasiva()">
+                    <i class="bi bi-check2-all me-1"></i> Aplicar Cambios
+                </button>
+            </div>
         </div>
 
         <!-- Grilla de Resultados -->
@@ -193,6 +250,9 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
+                            <th class="text-center" style="width:40px;">
+                                <input type="checkbox" class="form-check-input" id="checkSelectAll" onclick="toggleSelectAll(this)" title="Seleccionar todos en la página">
+                            </th>
                             <th>Folio</th>
                             <th>Fecha</th>
                             <th>Tipo Doc</th>
@@ -201,11 +261,12 @@
                             <th class="text-end">IVA</th>
                             <th class="text-end">Total</th>
                             <th class="text-center">Estado SII</th>
+                            <th class="text-center" style="width: 140px;">Estado de Pago</th>
                         </tr>
                     </thead>
                     <tbody id="resultadosBody">
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="10" class="text-center py-5 text-muted">
                                 <span class="spinner-border spinner-border-sm me-2 text-primary"></span>
                                 Cargando documentos emitidos desde Facto API...
                             </td>
@@ -269,39 +330,46 @@
 
 <script>
     let currentFactoPage = 1;
+    let currentDocsData = [];
 
     async function buscarDocumentos(page = 1) {
         currentFactoPage = page;
-        const cliente = document.getElementById('filterCliente').value;
-        const numero = document.getElementById('filterNumero').value;
-        const tipoDte = document.getElementById('filterTipoDte').value;
-        const fInicio = document.getElementById('filterFechaInicio').value;
-        const fFin = document.getElementById('filterFechaFin').value;
+        document.getElementById('checkSelectAll').checked = false;
+        actualizarSeleccion();
+
+        const cliente    = document.getElementById('filterCliente').value;
+        const numero     = document.getElementById('filterNumero').value;
+        const tipoDte    = document.getElementById('filterTipoDte').value;
+        const estadoPago = document.getElementById('filterEstadoPago').value;
+        const fInicio    = document.getElementById('filterFechaInicio').value;
+        const fFin       = document.getElementById('filterFechaFin').value;
 
         const params = new URLSearchParams({
             cliente: cliente,
             numero: numero,
             tipo_dte: tipoDte,
+            estado_pago: estadoPago,
             fecha_inicio: fInicio,
             fecha_fin: fFin,
             page: currentFactoPage
         });
 
         const tbody = document.getElementById('resultadosBody');
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-primary"></span>Consultando Facto API...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-primary"></span>Consultando Facto API...</td></tr>`;
 
         try {
             const response = await fetch(baseUrl + 'cobranza/facto/buscar-dtes?' + params.toString());
             const res = await response.json();
 
             if (res.success && res.data.length > 0) {
+                currentDocsData = res.data;
                 const totalCount = res.pagination ? res.pagination.count : res.data.length;
                 document.getElementById('countBadge').textContent = `${totalCount} documentos`;
                 document.getElementById('statTotalCount').textContent = totalCount;
                 
                 tbody.innerHTML = res.data.map(d => {
-                    const netoFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.neto);
-                    const ivaFmt  = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.iva);
+                    const netoFmt  = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.neto);
+                    const ivaFmt   = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.iva);
                     const totalFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.total);
                     
                     let badgeClass = 'bg-secondary';
@@ -309,9 +377,14 @@
                     else if (d.codigo_sii === 52) badgeClass = 'bg-warning-subtle text-warning border border-warning-subtle';
                     else if (d.codigo_sii === 39) badgeClass = 'bg-success-subtle text-success border border-success-subtle';
                     else if (d.codigo_sii === 61) badgeClass = 'bg-danger-subtle text-danger border border-danger-subtle';
+
+                    const stClass = d.estado_pago || 'pendiente';
                     
                     return `
                     <tr>
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input doc-checkbox" data-folio="${d.folio}" data-codigo="${d.codigo_sii}" onclick="actualizarSeleccion()">
+                        </td>
                         <td class="fw-bold">${d.folio}</td>
                         <td>${d.fecha}</td>
                         <td><span class="badge-dte ${badgeClass}">${d.tipo_documento}</span></td>
@@ -324,6 +397,13 @@
                         <td class="text-end fw-bold text-dark">${totalFmt}</td>
                         <td class="text-center">
                             <span class="badge ${d.estado_sii === 'Aceptado' ? 'bg-success-subtle text-success border border-success' : 'bg-warning-subtle text-warning border border-warning'}">${d.estado_sii}</span>
+                        </td>
+                        <td class="text-center">
+                            <select class="form-select form-select-sm status-select ${stClass}" onchange="cambiarEstadoIndividual('${d.folio}', ${d.codigo_sii}, this.value, this)">
+                                <option value="pendiente" ${stClass === 'pendiente' ? 'selected' : ''}>🔴 Pendiente</option>
+                                <option value="pagada" ${stClass === 'pagada' ? 'selected' : ''}>🟢 Pagada</option>
+                                <option value="parcial" ${stClass === 'parcial' ? 'selected' : ''}>🟡 Parcial</option>
+                            </select>
                         </td>
                     </tr>`;
                 }).join('');
@@ -383,12 +463,93 @@
                     message = `<span class="text-danger fw-medium">${res.message}</span>`;
                 }
                 
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">${message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-muted">${message}</td></tr>`;
                 document.getElementById('paginationContainer').style.setProperty('display', 'none', 'important');
             }
         } catch(e) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-danger">Error al consultar Facto API: ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-danger">Error al consultar Facto API: ${e.message}</td></tr>`;
             document.getElementById('paginationContainer').style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    // ── Selección Masiva Checkbox ────────────────────────────────
+    function toggleSelectAll(headerCheck) {
+        const checkboxes = document.querySelectorAll('.doc-checkbox');
+        checkboxes.forEach(c => c.checked = headerCheck.checked);
+        actualizarSeleccion();
+    }
+
+    function actualizarSeleccion() {
+        const selected = document.querySelectorAll('.doc-checkbox:checked');
+        const bulkBar = document.getElementById('bulkActionsBar');
+        const selectedCountText = document.getElementById('selectedCountText');
+
+        if (selected.length > 0) {
+            bulkBar.style.setProperty('display', 'flex', 'important');
+            selectedCountText.textContent = `${selected.length} documento${selected.length > 1 ? 's' : ''} seleccionado${selected.length > 1 ? 's' : ''}`;
+        } else {
+            bulkBar.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    // ── Actualización Individual ────────────────────────────────
+    async function cambiarEstadoIndividual(folio, codigoSii, nuevoEstado, selectElem) {
+        selectElem.className = `form-select form-select-sm status-select ${nuevoEstado}`;
+
+        try {
+            const response = await fetch(baseUrl + 'cobranza/facto/actualizar-estado-pago', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folio: folio,
+                    codigo_sii: codigoSii,
+                    estado_pago: nuevoEstado
+                })
+            });
+            const res = await response.json();
+            if (res.success) {
+                mostrarToast(`Folio ${folio} actualizado a ${nuevoEstado}`, 'success');
+            } else {
+                mostrarToast(res.message || 'Error al actualizar', 'danger');
+            }
+        } catch (e) {
+            mostrarToast('Error al conectar con el servidor', 'danger');
+        }
+    }
+
+    // ── Actualización Masiva Combo Box ──────────────────────────
+    async function aplicarAccionMasiva() {
+        const selected = document.querySelectorAll('.doc-checkbox:checked');
+        if (selected.length === 0) {
+            mostrarToast('Seleccione al menos un documento', 'warning');
+            return;
+        }
+
+        const nuevoEstado = document.getElementById('bulkEstadoSelect').value;
+        const documentos = Array.from(selected).map(c => ({
+            folio: c.getAttribute('data-folio'),
+            codigo_sii: parseInt(c.getAttribute('data-codigo'))
+        }));
+
+        try {
+            const response = await fetch(baseUrl + 'cobranza/facto/actualizar-estado-masivo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    documentos: documentos,
+                    nuevo_estado: nuevoEstado
+                })
+            });
+            const res = await response.json();
+
+            if (res.success) {
+                mostrarToast(res.message, 'success');
+                buscarDocumentos(currentFactoPage);
+            } else {
+                mostrarToast(res.message || 'Error al actualizar seleccionados', 'danger');
+            }
+        } catch (e) {
+            mostrarToast('Error al conectar con el servidor', 'danger');
         }
     }
 
@@ -400,6 +561,22 @@
     function limpiarFiltros() {
         document.getElementById('formFiltros').reset();
         buscarDocumentos(1);
+    }
+
+    function mostrarToast(mensaje, tipo = 'info') {
+        const toastWrapper = document.getElementById('toastWrapper');
+        const bgClass = tipo === 'success' ? 'bg-success' : (tipo === 'danger' ? 'bg-danger' : 'bg-warning');
+        const toastHtml = `
+            <div class="toast align-items-center text-white ${bgClass} border-0 show" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body fw-medium">
+                        ${mensaje}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>`;
+        toastWrapper.innerHTML = toastHtml;
+        setTimeout(() => { toastWrapper.innerHTML = ''; }, 3500);
     }
 
     // Carga inicial al cargar la página
