@@ -7,6 +7,7 @@
  */
 $activePage = $activePage ?? 'admin';
 $contabOpen = ['balance-diario', 'gastos', 'pagos-mensuales', 'historial-balances'];
+$cobranzaOpen = ['documentos-impago'];
 $cpOpen = ['cargar-entidad', 'buscar-entidad'];
 $bodegaOpen    = ['productos', 'carga-masiva-productos'];
 $logisticaOpen = ['hoja-de-ruta', 'despachos-agendados', 'funcionarios'];
@@ -64,6 +65,18 @@ function sbOpenClass(array $g, string $active): string
             </a>
             <a href="<?= site_url('historial-balances') ?>" class="sub-link<?= sbActive('historial-balances', $activePage) ?>">
                 <i class="bi bi-clock-history"></i> Historial de balances
+            </a>
+        </div>
+
+        <div class="nav-sec">Cobranza</div>
+        <button class="s-parent<?= sbOpen($cobranzaOpen, $activePage) ?>" onclick="toggleMenu('menuCobranza')"
+            id="parentCobranza">
+            <i class="bi bi-wallet2"></i><span>Cobranza</span>
+            <i class="bi bi-chevron-right chevron"></i>
+        </button>
+        <div class="sub-nav" id="menuCobranza" class="sub-nav<?= sbOpenClass($cobranzaOpen, $activePage) ?>">
+            <a href="<?= site_url('cobranza/documentos-impago') ?>" class="sub-link<?= sbActive('documentos-impago', $activePage) ?>">
+                <i class="bi bi-file-earmark-exclamation-fill"></i> Documentos impago
             </a>
         </div>
 
@@ -169,6 +182,7 @@ function sbOpenClass(array $g, string $active): string
         var groups = {
             menuCP: <?= json_encode($cpOpen) ?>,
             menuContab: <?= json_encode($contabOpen) ?>,
+            menuCobranza: <?= json_encode($cobranzaOpen) ?>,
             menuBodega: <?= json_encode($bodegaOpen) ?>,
             menuLogistica: <?= json_encode($logisticaOpen) ?>,
             menuDev: <?= json_encode($devOpen) ?>,

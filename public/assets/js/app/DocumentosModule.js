@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DocumentosModule.js — CRUD genérico de documentos (Cobrar / Pagar)
  * ─────────────────────────────────────────────────────────────────────────
  * Razón: Cuentas por Cobrar y Cuentas por Pagar son módulos idénticos
@@ -313,7 +313,7 @@ window.DocumentosModule = (function () {
         const tit = document.getElementById(cfg.detalleTitulo);
         const body = document.getElementById(cfg.detalleBody);
         if (hdr) hdr.style.background = cfg.color;
-        if (tit) tit.textContent = `Detalle — Cuentas por ${_capitalize(cfg.tipo)}`;
+        if (tit) tit.textContent = `Detalle - Cuentas por ${_capitalize(cfg.tipo)}`;
         window['_detalleId_' + cfg.tipo] = id;
         _renderDetalleBody(cfg, id, body);
         PortalApp.showModal(cfg.modalDetalle);
@@ -336,7 +336,7 @@ window.DocumentosModule = (function () {
                     <td style="padding:6px 10px;font-size:.78rem;font-weight:500;">${d.nro || d.numero || '—'}</td>
                     <td style="padding:6px 10px;font-size:.76rem;color:#64748b;">${d.fecha || '—'}</td>
                     <td style="padding:6px 10px;text-align:right;color:#2563eb;font-weight:700;">${PortalApp.fmt(d.monto ?? d.total ?? 0)}</td>
-                    <td style="padding:6px 8px;text-align:center;">
+                    <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
                         <button onclick="DocumentosModule.eliminarDocDetalle(window._CFG_${cfg.tipo.toUpperCase()},${id},${idx})"
                             title="Eliminar documento"
                             style="border:none;background:transparent;color:#dc2626;padding:2px 6px;border-radius:6px;cursor:pointer;font-size:.85rem;"
@@ -367,24 +367,24 @@ window.DocumentosModule = (function () {
             <i class="bi bi-receipt me-1" style="color:${color};"></i>
             Documentos <span class="badge" style="background:#eff6ff;color:#2563eb;margin-left:4px;">${docs.length}</span>
         </div>
-        <div style="max-height:260px;overflow-y:auto;border-radius:8px;border:1px solid #e5eaf0;">
-            <table class="table table-sm mb-0" style="font-size:.78rem;">
-                <thead style="position:sticky;top:0;">
+        <div style="max-height:380px;overflow-y:auto;overflow-x:auto;border-radius:8px;border:1px solid #e5eaf0;position:relative;">
+            <table class="table table-sm mb-0" style="font-size:.78rem;width:100%;">
+                <thead style="position:sticky;top:0;z-index:10;background:#f8fafc;">
                     <tr style="background:#f8fafc;">
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;">Tipo</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;">N° Doc.</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;">Fecha</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;">Monto</th>
-                        <th style="padding:8px 10px;"></th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Tipo</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">N° Doc.</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Fecha</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Monto</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:70px;background:#f8fafc;">Acción</th>
                     </tr>
                 </thead>
                 <tbody>${docsRows}</tbody>
                 ${docs.length > 1 ? `
-                <tfoot>
+                <tfoot style="position:sticky;bottom:0;z-index:10;background:#f0f4f9;">
                     <tr style="background:#f0f4f9;">
-                        <td colspan="3" style="padding:8px 12px;font-size:.74rem;font-weight:700;color:#1a2940;text-align:right;">TOTAL</td>
-                        <td style="padding:8px 12px;text-align:right;font-weight:800;color:${color};">${PortalApp.fmt(totalMonto)}</td>
-                        <td></td>
+                        <td colspan="3" style="padding:8px 12px;font-size:.74rem;font-weight:700;color:#1a2940;text-align:right;background:#f0f4f9;">TOTAL</td>
+                        <td style="padding:8px 12px;text-align:right;font-weight:800;color:${color};background:#f0f4f9;">${PortalApp.fmt(totalMonto)}</td>
+                        <td style="background:#f0f4f9;"></td>
                     </tr>
                 </tfoot>` : ''}
             </table>

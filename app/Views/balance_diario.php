@@ -175,6 +175,11 @@
                                     onclick="abrirModalAgregarCobrar()">
                                     <i class="bi bi-plus-lg me-1"></i>Nuevo
                                 </button>
+                                <button class="btn btn-sm"
+                                    style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
+                                    onclick="maximizarPanel('cobrar')" title="Maximizar vista">
+                                    <i class="bi bi-arrows-angle-expand"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -211,11 +216,18 @@
                         <!-- Header -->
                         <div class="panel-head" style="background:var(--caja-head);">
                             <div class="ph-title"><i class="bi bi-box-seam-fill"></i>Caja / Inventario</div>
-                            <button class="btn btn-sm"
-                                style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
-                                onclick="recargarInventario()" title="Actualizar desde BD">
-                                <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
-                            </button>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm"
+                                    style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
+                                    onclick="recargarInventario()" title="Actualizar desde BD">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+                                </button>
+                                <button class="btn btn-sm"
+                                    style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
+                                    onclick="maximizarPanel('caja')" title="Maximizar vista">
+                                    <i class="bi bi-arrows-angle-expand"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Input búsqueda rápida -->
@@ -233,13 +245,14 @@
                                     <tr>
                                         <th>Descripción</th>
                                         <th class="text-end">Precio</th>
-                                        <th class="text-end">Stock</th>
+                                        <th class="text-end">Stock disp.</th>
+                                        <th class="text-end">Stock res.</th>
                                         <th class="text-end">Total</th>
                                         <th class="text-center" style="width:80px;">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="bodyCaja">
-                                    <tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;font-size:.80rem;">
+                                    <tr><td colspan="6" style="text-align:center;padding:20px;color:#94a3b8;font-size:.80rem;">
                                         <span class="spinner-border spinner-border-sm me-2"></span>Cargando inventario...
                                     </td></tr>
                                 </tbody>
@@ -272,6 +285,11 @@
                                     style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
                                     onclick="abrirModalAgregarPagar()">
                                     <i class="bi bi-plus-lg me-1"></i>Nuevo
+                                </button>
+                                <button class="btn btn-sm"
+                                    style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
+                                    onclick="maximizarPanel('pagar')" title="Maximizar vista">
+                                    <i class="bi bi-arrows-angle-expand"></i>
                                 </button>
                             </div>
                         </div>
@@ -331,6 +349,28 @@
     </div>
 
     <!-- ══════════════════════════════════════════
+     MODAL – Maximizar Vista (Cobrar, Caja, Pagar)
+    ═══════════════════════════════════════════ -->
+    <div class="modal fade" id="modalMaximizar" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;box-shadow:0 20px 60px rgba(0,0,0,.18);">
+                <div class="modal-header py-3" id="maxModalHeader">
+                    <h6 class="modal-title text-white" id="maxModalTitulo">
+                        <i class="bi bi-arrows-angle-expand me-2"></i>Vista Maximizada
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+                </div>
+                <div class="modal-body p-4" style="max-height: 70vh; overflow-y: auto;">
+                    <div id="maxModalBody"></div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
+                    <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
      MODAL – Editar Stock Producto Inventario
 ═══════════════════════════════════════════ -->
     <div class="modal fade" id="modalEditarProducto" tabindex="-1">
@@ -354,15 +394,34 @@
                         <label style="font-size:.76rem;font-weight:600;color:#5a7394;">Precio (IVA incluido)</label>
                         <div id="editProdPrecio" style="font-size:.88rem;font-weight:700;color:#0891b2;padding:6px 0;"></div>
                     </div>
-                    <div class="mb-1">
-                        <label class="form-label" style="font-size:.76rem;font-weight:600;color:#5a7394;">Stock en bodega</label>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.76rem;font-weight:600;color:#5a7394;">Stock físico en bodega</label>
                         <input type="number" class="form-control form-control-sm" id="editProdStock" min="0" step="1">
-                        <div class="form-text" style="font-size:.70rem;color:#94a3b8;">Solo edición visual local — no modifica la BD de productos.</div>
+                        <div class="form-text" style="font-size:.70rem;color:#94a3b8;">El cambio se guardará en la base de datos al presionar Guardar.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:.76rem;font-weight:600;color:#5a7394;">Stock reservado</label>
+                        <div class="input-group">
+                            <input type="number" id="editProdReservado" class="form-control"
+                                   style="padding: 8px 12px; border: 1.5px solid #ddd6fe; border-radius: 9px 0 0 9px; font-size: .84rem; font-family: 'Inter', sans-serif; background: #f8fafc;"
+                                   placeholder="0" min="0" step="0.001" disabled>
+                            <button class="btn btn-outline-primary" type="button" 
+                                    style="border: 1.5px solid #7c3aed; background: #7c3aed; color: #fff; border-radius: 0 9px 9px 0; font-size: .80rem; font-weight: 600; padding: 0 16px;" 
+                                    onclick="abrirSubModalReservasCaja()">
+                                <i class="bi bi-people-fill me-1"></i>Asignar
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Contenedor para mostrar reservas activas directamente en el modal -->
+                    <div class="mt-3 pt-3 border-top" id="editProdReservasContainer" style="display: none;">
+                        <label style="font-size:.76rem;font-weight:600;color:#5a7394;margin-bottom:6px;">Clientes con Reserva</label>
+                        <div style="max-height: 120px; overflow-y: auto; font-size: .78rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fafafa; padding: 6px 12px;" id="editProdReservasLista">
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
                     <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;" data-bs-dismiss="modal">Cancelar</button>
-                    <button class="btn btn-sm" onclick="guardarEdicionProducto()"
+                    <button class="btn btn-sm" id="btnGuardarEdicionProducto" onclick="guardarEdicionProducto()"
                         style="background:var(--caja-head);color:#fff;border-radius:8px;font-weight:600;">
                         <i class="bi bi-check-lg me-1"></i>Guardar
                     </button>
@@ -389,7 +448,7 @@
                                 Cliente <span class="text-danger">*</span></label>
                             <div class="ac-wrap" style="position:relative;">
                                 <input class="form-control form-control-sm" id="cobrarCliente"
-                                    placeholder="Razón social del cliente" autocomplete="off" oninput="acBuscar(this)"
+                                    placeholder="Nombre del cliente" autocomplete="off" oninput="acBuscar(this)"
                                     onkeydown="acKeydown(event)">
                                 <div id="acDropdown" class="ac-dropdown" style="display:none;"></div>
                             </div>
@@ -511,12 +570,12 @@
         </div>
     </div>
 
-    <!-- MODAL – Detalle -->
+    <!-- MODAL - Detalle Cobrar -->
     <div class="modal fade" id="modalDetalle" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content" style="border-radius:14px;">
                 <div class="modal-header py-3" id="detalleHeader" style="background:var(--cobrar-head);">
-                    <h6 class="modal-title text-white" id="detalleTitulo">Detalle</h6>
+                    <h6 class="modal-title text-white" id="detalleTitulo">Detalle - Cuentas por Cobrar</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
                 </div>
                 <div class="modal-body p-4" id="detalleBody"></div>
@@ -735,7 +794,7 @@
         <div class="modal-dialog modal-dialog-scrollable">
             <div class="modal-content" style="border-radius:14px;">
                 <div class="modal-header py-3" id="modalHeaderPagar" style="background:var(--pagar-head);">
-                    <h6 class="modal-title text-white" id="modalTituloPagar">Nuevo â€” Cuentas por Pagar</h6>
+                    <h6 class="modal-title text-white" id="modalTituloPagar">Nuevo - Cuentas por Pagar</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
                 </div>
                 <div class="modal-body p-4">
@@ -840,10 +899,10 @@
          MODAL â€” Detalle Pagar
     â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <div class="modal fade" id="modalDetallePagar" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content" style="border-radius:14px;">
                 <div class="modal-header py-3" id="detalleHeaderPagar" style="background:var(--pagar-head);">
-                    <h6 class="modal-title text-white" id="detalleTituloPagar">Detalle â€” Cuentas por Pagar</h6>
+                    <h6 class="modal-title text-white" id="detalleTituloPagar">Detalle - Cuentas por Pagar</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
                 </div>
                 <div class="modal-body p-4" id="detalleBodyPagar"></div>
@@ -1131,7 +1190,7 @@
         function _acSeleccionar(c) {
             var inp = document.getElementById('cobrarCliente');
             var rut = document.getElementById('cobrarRut');
-            if (inp) inp.value = c.razon_social || c.nombre || '';
+            if (inp) inp.value = c.nombre || c.razon_social || '';
             if (rut) rut.value = c.rut || '';
             _acCerrar();
         }
@@ -1146,7 +1205,7 @@
                 items.forEach(function (c) {
                     var div = document.createElement('div');
                     div.className = 'ac-item';
-                    div.innerHTML = '<div class="ac-nombre">' + (c.razon_social || c.nombre || '') + '</div><div class="ac-rut">' + (c.rut || '') + '</div>';
+                    div.innerHTML = '<div class="ac-nombre">' + (c.nombre || c.razon_social || '') + '</div><div class="ac-rut">' + (c.rut || '') + '</div>';
                     div.addEventListener('mousedown', function (e) { e.preventDefault(); _acSeleccionar(c); });
                     d.appendChild(div);
                 });
@@ -1203,6 +1262,86 @@
             }
         });
     </script>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         SUB-MODAL GESTIONAR RESERVAS POR CLIENTE (CAJA / INVENTARIO)
+         (Se abre desde el modal Editar Producto)
+    ════════════════════════════════════════════════════════════════ -->
+    <div class="modal fade" id="modalReservasCliente" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 540px;">
+            <div class="modal-content" style="border-radius: 18px; overflow: hidden; border: none; box-shadow: 0 20px 60px rgba(0,0,0,.25);">
+                <div class="modal-header py-3" style="background: linear-gradient(135deg, #1e1b4b, #312e81); color: #fff; border: none;">
+                    <h6 class="modal-title d-flex align-items-center gap-2">
+                        <i class="bi bi-people-fill"></i> Reservas por Cliente
+                        <span style="font-size: .75rem; opacity: .7; font-weight: 400;" id="resSku"></span>
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter: invert(1);"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Info Producto -->
+                    <div class="mb-3 p-3" style="background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <div style="font-size: .70rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em;">Producto</div>
+                        <div style="font-size: .88rem; font-weight: 700; color: #1e293b;" id="resProductoNombre">--</div>
+                    </div>
+
+                    <!-- Tabla de Reservas Existentes -->
+                    <div class="mb-4">
+                        <div style="font-size: .72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;">Reservas Activas</div>
+                        <div style="max-height: 180px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff;">
+                            <table class="table table-sm table-hover mb-0" style="font-size: .80rem; vertical-align: middle;">
+                                <thead class="table-light" style="position: sticky; top: 0; font-size: .70rem; text-transform: uppercase;">
+                                    <tr>
+                                        <th class="ps-3">Cliente</th>
+                                        <th class="text-end">Cantidad</th>
+                                        <th class="text-center" style="width: 130px;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbodyReservasCliente">
+                                    <tr>
+                                        <td colspan="3" class="text-center py-3 text-muted">Cargando reservas...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Formulario Nueva Reserva -->
+                    <div class="p-3" style="background: #f5f3ff; border-radius: 12px; border: 1px solid #ddd6fe;">
+                        <div style="font-size: .72rem; font-weight: 700; color: #6d28d9; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px;">Asignar Nueva Reserva</div>
+                        
+                        <div class="mb-3 position-relative">
+                            <label class="form-label-sm" style="color: #6d28d9; font-size: .75rem; font-weight: 600;">Buscar Cliente (Nombre o RUT)</label>
+                            <input type="text" id="resBuscarCliente" class="form-control form-control-sm" placeholder="🔍 Escribe para buscar cliente..." oninput="buscarClientesAutocomplete(this.value)" autocomplete="off" style="border: 1.5px solid #ddd6fe; border-radius: 8px;">
+                            <!-- Resultados Autocomplete -->
+                            <div id="resAutocompleteResults" class="shadow-sm border rounded-3 position-absolute w-100 bg-white" style="display: none; z-index: 1050; max-height: 150px; overflow-y: auto; margin-top: 2px;">
+                            </div>
+                            <input type="hidden" id="resRutCliente">
+                        </div>
+                        
+                        <div class="row g-2 align-items-end">
+                            <div class="col-8">
+                                <label class="form-label-sm" style="color: #6d28d9; font-size: .75rem; font-weight: 600;">Cantidad a Reservar</label>
+                                <input type="number" id="resCantidad" class="form-control form-control-sm" placeholder="0.000" min="0.001" step="0.001" style="border: 1.5px solid #ddd6fe; border-radius: 8px;">
+                            </div>
+                            <div class="col-4">
+                                <button type="button" class="btn btn-sm w-100" style="background: #7c3aed; color: #fff; padding: 6px; border-radius: 8px; font-weight: 600; border: none; font-size: .78rem;" onclick="guardarNuevaReserva()">
+                                    <i class="bi bi-plus-lg"></i> Asignar
+                                </button>
+                            </div>
+                        </div>
+                        <div id="resError" style="display: none; margin-top: 10px; font-size: .75rem; border-radius: 8px;" class="alert alert-danger py-1 px-3"></div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #f0f4f9;">
+                    <button type="button" class="btn btn-sm" style="background: #f0f4f9; color: #5a7394; border-radius: 9px; padding: 7px 18px;" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .autocomplete-item:hover { background: #f1f5f9; }
+    </style>
 </body>
 
 </html>

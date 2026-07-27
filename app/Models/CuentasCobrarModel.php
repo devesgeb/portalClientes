@@ -47,11 +47,11 @@ class CuentasCobrarModel extends Model
     {
         $query = $this->db->query("
             SELECT d.*,
-                COALESCE(c.razon_social, c.nombre, d.rut_cliente) AS nombre_cliente
+                COALESCE(c.nombre, c.razon_social, d.rut_cliente) AS nombre_cliente
             FROM `tbl_documentos_cobrar` d
             LEFT JOIN `tbl_clientes` c ON c.rut = d.rut_cliente
             WHERE d.impago > 0
-        ORDER BY COALESCE(c.razon_social, c.nombre, d.rut_cliente) ASC, d.fecha DESC
+        ORDER BY COALESCE(c.nombre, c.razon_social, d.rut_cliente) ASC, d.fecha DESC
         ");
         return $query ? $query->getResultArray() : [];
     }
@@ -109,11 +109,15 @@ class CuentasCobrarModel extends Model
 
             if (empty($rut) || empty($docs)) continue;
 
-            // ── Auto-crear cliente en tbl_clientes si no existe (para respetar la FK) ──
+            // ── Auto-crear o actualizar cliente en tbl_clientes ──
             $existe = $db->table('tbl_clientes')->where('rut', $rut)->countAllResults();
             if (!$existe) {
                 $db->table('tbl_clientes')->insert([
                     'rut'    => $rut,
+                    'nombre' => $nombre ?: $rut,
+                ]);
+            } else {
+                $db->table('tbl_clientes')->where('rut', $rut)->update([
                     'nombre' => $nombre ?: $rut,
                 ]);
             }

@@ -51,6 +51,12 @@ $routes->post('/cuentas-pagar/sincronizar', 'BalanceDiario::sincronizarPagar');
 $routes->delete('/cuentas-pagar/eliminar', 'BalanceDiario::eliminarPagar');
 // Verificar si N° documento existe en Pagar
 $routes->get('/cuentas-pagar/verificar-documento', 'BalanceDiario::verificarDocumentoPagar');
+// Abonos por documento
+$routes->get('/cuentas-pagar/abonos',              'BalanceDiario::listarAbonos');
+$routes->post('/cuentas-pagar/abonos',             'BalanceDiario::registrarAbono');
+$routes->delete('/cuentas-pagar/abonos/(:num)',    'BalanceDiario::eliminarAbono/$1');
+$routes->patch('/cuentas-pagar/comentario-doc',    'BalanceDiario::actualizarComentarioDoc');
+
 
 
 
@@ -78,8 +84,19 @@ $routes->delete('/buscar-entidad/eliminar', 'BuscarEntidadController::eliminar')
 
 // Autocomplete clientes / proveedores
 $routes->get('/clientes/buscar', 'BalanceDiario::buscarClientes');
+$routes->post('/clientes/buscar-por-ruts', 'BalanceDiario::buscarClientesPorRuts');
 $routes->get('/proveedores/buscar', 'BalanceDiario::buscarProveedores');
 $routes->get('/inventario/productos', 'BalanceDiario::inventarioProductos');
+
+// ── Webhooks Tu Pana & Simulador ───────────────────────────────
+$routes->get('/webhook-test', 'WebhookReceiver::index');
+$routes->get('/webhook-test/buscar-dtes', 'WebhookReceiver::buscarDtes');
+$routes->get('/webhook-test/logs', 'WebhookReceiver::getLogs');
+$routes->delete('/webhook-test/logs', 'WebhookReceiver::clearLogs');
+$routes->post('/webhook/tupana', 'WebhookReceiver::receive');
+
+// ── Cobranza ──────────────────────────────────────────────────
+$routes->get('/cobranza/documentos-impago', 'WebhookReceiver::documentosImpago');
 
 // ── Logística ──────────────────────────────────────────────────
 $routes->get('/hoja-de-ruta',          'LogisticaController::hojaDeRuta');
@@ -100,6 +117,10 @@ $routes->get('/productos',                         'BodegaController::productos'
 $routes->get('/bodega/lista-productos',            'BodegaController::listarProductos');
 $routes->get('/bodega/producto/(:any)',             'BodegaController::getProducto/$1');
 $routes->patch('/bodega/producto/(:any)',           'BodegaController::actualizarProducto/$1');
+$routes->get('/bodega/reservas/(:any)',             'BodegaController::getReservas/$1');
+$routes->post('/bodega/reservas',                   'BodegaController::guardarReserva');
+$routes->post('/bodega/reservas/descontar',          'BodegaController::descontarReserva');
+$routes->delete('/bodega/reservas/(:num)',          'BodegaController::eliminarReserva/$1');
 $routes->delete('/bodega/producto/(:any)',          'BodegaController::eliminarProducto/$1');
 $routes->get('/carga-masiva-productos',            'BodegaController::cargaMasiva');
 $routes->post('/bodega/importar-productos',        'BodegaController::importarProductos');

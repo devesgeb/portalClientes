@@ -172,6 +172,9 @@
         .pag-btn:hover:not(:disabled) { border-color: #7c3aed; color: #7c3aed; }
         .pag-btn:disabled { opacity: .4; cursor: not-allowed; }
         .pag-info { font-size: .78rem; color: #94a3b8; }
+        
+        /* Autocomplete items styling */
+        .autocomplete-item:hover { background: #f1f5f9; }
     </style>
 </head>
 <body>
@@ -242,11 +245,11 @@
                         <tr>
                             <th>Nombre</th>
                             <th>SKU</th>
-                            <th>Lista de precio</th>
                             <th style="text-align:center;">Cant. disponible</th>
+                            <th style="text-align:center;">Stock reservado</th>
                             <th style="text-align:right;">Precio neto</th>
                             <th style="text-align:right;">Precio c/Impto</th>
-                            <th style="text-align:center;">Acciones</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbodyProductos">
@@ -294,10 +297,34 @@
                     <div class="form-label-sm">Nombre del producto</div>
                     <input type="text" id="editNombre" class="form-control-sm-custom" placeholder="Nombre del producto">
                 </div>
-                <div class="mb-1">
-                    <div class="form-label-sm">Cantidad disponible (Bodega Independencia)</div>
+                <div class="mb-3">
+                    <div class="form-label-sm">Costo neto ($)</div>
+                    <input type="number" id="editCostoNeto" class="form-control-sm-custom"
+                           placeholder="0" min="0" step="1">
+                </div>
+                <div class="mb-3">
+                    <div class="form-label-sm">Precio venta neto (Precios base) ($)</div>
+                    <input type="number" id="editPrecioNeto" class="form-control-sm-custom"
+                           placeholder="0" min="0" step="1">
+                </div>
+                <div class="mb-3">
+                    <div class="form-label-sm">Stock físico en bodega (Independencia)</div>
                     <input type="number" id="editCantidad" class="form-control-sm-custom"
                            placeholder="0" min="0" step="0.001">
+                </div>
+                <div class="mb-1">
+
+                    <div class="form-label-sm">Stock reservado</div>
+                    <div class="input-group">
+                        <input type="number" id="editReservado" class="form-control"
+                               style="padding: 8px 12px; border: 1.5px solid #ddd6fe; border-radius: 9px 0 0 9px; font-size: .84rem; font-family: 'Inter', sans-serif; background: #f8fafc;"
+                               placeholder="0" min="0" step="0.001" disabled>
+                        <button class="btn btn-outline-primary" type="button" 
+                                style="border: 1.5px solid #7c3aed; background: #7c3aed; color: #fff; border-radius: 0 9px 9px 0; font-size: .80rem; font-weight: 600; padding: 0 16px;" 
+                                onclick="abrirSubModalReservas()">
+                            <i class="bi bi-people-fill me-1"></i>Asignar
+                        </button>
+                    </div>
                 </div>
                 <div id="editError" style="display:none;margin-top:10px;" class="alert alert-danger py-2 px-3" style="font-size:.80rem;border-radius:8px;"></div>
             </div>
@@ -308,6 +335,83 @@
                         onclick="guardarEdicion()">
                     <i class="bi bi-check-lg me-1"></i>Guardar cambios
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     SUB-MODAL GESTIONAR RESERVAS POR CLIENTE
+     (Se abre desde el modal Editar Producto)
+════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalReservasCliente" tabindex="-1" style="z-index: 1070;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 540px;">
+        <div class="modal-content" style="border-radius: 18px; overflow: hidden; border: none; box-shadow: 0 20px 60px rgba(0,0,0,.25);">
+            <div class="modal-header py-3" style="background: linear-gradient(135deg, #1e1b4b, #312e81); color: #fff; border: none;">
+                <h6 class="modal-title d-flex align-items-center gap-2">
+                    <i class="bi bi-people-fill"></i> Reservas por Cliente
+                    <span style="font-size: .75rem; opacity: .7; font-weight: 400;" id="resSku"></span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter: invert(1);"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Info Producto -->
+                <div class="mb-3 p-3" style="background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: .70rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em;">Producto</div>
+                    <div style="font-size: .88rem; font-weight: 700; color: #1e293b;" id="resProductoNombre">--</div>
+                </div>
+
+                <!-- Tabla de Reservas Existentes -->
+                <div class="mb-4">
+                    <div style="font-size: .72rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;">Reservas Activas</div>
+                    <div style="max-height: 180px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff;">
+                        <table class="table table-sm table-hover mb-0" style="font-size: .80rem; vertical-align: middle;">
+                            <thead class="table-light" style="position: sticky; top: 0; font-size: .70rem; text-transform: uppercase;">
+                                <tr>
+                                    <th class="ps-3">Cliente</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-center" style="width: 130px;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyReservasCliente">
+                                <tr>
+                                    <td colspan="3" class="text-center py-3 text-muted">Cargando reservas...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Formulario Nueva Reserva -->
+                <div class="p-3" style="background: #f5f3ff; border-radius: 12px; border: 1px solid #ddd6fe;">
+                    <div style="font-size: .72rem; font-weight: 700; color: #6d28d9; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px;">Asignar Nueva Reserva</div>
+                    
+                    <div class="mb-3 position-relative">
+                        <label class="form-label-sm" style="color: #6d28d9;">Buscar Cliente (Nombre o RUT)</label>
+                        <input type="text" id="resBuscarCliente" class="form-control-sm-custom" placeholder="🔍 Escribe para buscar cliente..." oninput="buscarClientesAutocomplete(this.value)" autocomplete="off">
+                        <!-- Resultados Autocomplete -->
+                        <div id="resAutocompleteResults" class="shadow-sm border rounded-3 position-absolute w-100 bg-white" style="display: none; z-index: 1050; max-height: 150px; overflow-y: auto; margin-top: 2px;">
+                        </div>
+                        <input type="hidden" id="resRutCliente">
+                    </div>
+                    
+                    <div class="row g-2 align-items-end">
+                        <div class="col-8">
+                            <label class="form-label-sm" style="color: #6d28d9;">Cantidad a Reservar</label>
+                            <input type="number" id="resCantidad" class="form-control-sm-custom" placeholder="0.000" min="0.001" step="0.001">
+                        </div>
+                        <div class="col-4">
+                            <button type="button" class="btn btn-sm w-100" style="background: #7c3aed; color: #fff; padding: 8px; border-radius: 9px; font-weight: 600; border: none; font-size: .78rem;" onclick="guardarNuevaReserva()">
+                                <i class="bi bi-plus-lg"></i> Asignar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="resError" style="display: none; margin-top: 10px; font-size: .75rem; border-radius: 8px;" class="alert alert-danger py-1 px-3"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #f0f4f9;">
+                <button type="button" class="btn btn-sm" style="background: #f0f4f9; color: #5a7394; border-radius: 9px; padding: 7px 18px;" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
@@ -536,6 +640,8 @@ function renderTabla() {
 
     tbody.innerHTML = page.map(p => {
         const stock        = parseFloat(p.stock_bodega_ppral) || 0;
+        const reservado    = parseFloat(p.stock_reservado) || 0;
+        const disponible   = Math.max(0, stock - reservado);
         const listaFiltro  = document.getElementById('filtroLista').value;
 
         // Determinar qué lista usar para mostrar el precio
@@ -555,17 +661,20 @@ function renderTabla() {
         <tr>
             <td class="nombre-cell" title="${p.nombre || ''}">${p.nombre || '--'}</td>
             <td><span class="sku-badge">${p.sku}</span></td>
-            <td class="listas-cell">${listas || '<span style="color:#94a3b8;font-size:.76rem;">Sin lista</span>'}</td>
             <td style="text-align:center;">
-                <span class="stock-cell ${stockClass(stock)}">${fmtN(stock)}</span>
+                <span class="stock-cell ${stockClass(disponible)}">${fmtN(disponible)}</span>
+                <span style="font-size:.70rem;color:#94a3b8;margin-left:2px;">${p.unidad || ''}</span>
+            </td>
+            <td style="text-align:center;">
+                <span class="stock-cell" style="color:#4f46e5;font-weight:700;">${fmtN(parseFloat(p.stock_reservado) || 0)}</span>
                 <span style="font-size:.70rem;color:#94a3b8;margin-left:2px;">${p.unidad || ''}</span>
             </td>
             <td class="precio-cell" style="text-align:right;">${precioNeto}</td>
             <td class="precio-imp"  style="text-align:right;">${precioTotal}</td>
             <td>
                 <div class="acciones-cell">
-                    <button class="btn-accion btn-editar" title="Editar nombre y cantidad"
-                            onclick="abrirEditar('${p.sku}','${(p.nombre||'').replace(/'/g,"\\'")}',${stock})">
+                    <button class="btn-accion btn-editar" title="Editar producto"
+                            onclick="abrirEditar('${p.sku}','${(p.nombre||'').replace(/'/g,"\\'")}',${stock},${parseFloat(p.stock_reservado) || 0})">
                         <i class="bi bi-pencil-fill"></i>
                     </button>
                     <button class="btn-accion btn-ver" title="Ver detalle"
@@ -606,11 +715,23 @@ function actualizarPills() {
 }
 
 // ── MODAL EDITAR ──────────────────────────────────────────────
-function abrirEditar(sku, nombre, cantidad) {
+function abrirEditar(sku, nombre, cantidad, reservado) {
     _skuEditar = sku;
     document.getElementById('editSku').textContent    = sku;
     document.getElementById('editNombre').value       = nombre;
     document.getElementById('editCantidad').value     = cantidad;
+    document.getElementById('editReservado').value    = reservado;
+
+    // Buscar costo y precio base en memoria local
+    const p = _todos.find(x => x.sku === sku);
+    const costo = p ? (p.costo_neto || 0) : 0;
+    const preciosBase = p && p.precios_lista && p.precios_lista['Precios base'] 
+        ? p.precios_lista['Precios base'].precio_neto 
+        : 0;
+
+    document.getElementById('editCostoNeto').value = costo;
+    document.getElementById('editPrecioNeto').value = preciosBase;
+
     document.getElementById('editError').style.display = 'none';
     new bootstrap.Modal(document.getElementById('modalEditar')).show();
 }
@@ -620,8 +741,11 @@ async function guardarEdicion() {
     const errEl = document.getElementById('editError');
     errEl.style.display = 'none';
 
-    const nombre   = document.getElementById('editNombre').value.trim();
-    const cantidad = parseFloat(document.getElementById('editCantidad').value);
+    const nombre    = document.getElementById('editNombre').value.trim();
+    const cantidad  = parseFloat(document.getElementById('editCantidad').value) || 0;
+    const reservado = parseFloat(document.getElementById('editReservado').value) || 0;
+    const costoNeto = parseFloat(document.getElementById('editCostoNeto').value) || 0;
+    const precioNeto = parseFloat(document.getElementById('editPrecioNeto').value) || 0;
 
     if (!nombre) { errEl.textContent = 'El nombre no puede estar vacío.'; errEl.style.display='block'; return; }
 
@@ -632,14 +756,34 @@ async function guardarEdicion() {
         const resp = await fetch(BASE + 'bodega/producto/' + encodeURIComponent(_skuEditar), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre, stock_bodega_ppral: cantidad }),
+            body: JSON.stringify({ 
+                nombre, 
+                stock_bodega_ppral: cantidad, 
+                stock_reservado: reservado,
+                costo_neto: costoNeto,
+                precio_venta_neto: precioNeto
+            }),
         });
         const json = await resp.json();
         if (json.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalEditar')).hide();
             // Actualizar en memoria sin recargar todo
             const p = _todos.find(x => x.sku === _skuEditar);
-            if (p) { p.nombre = nombre; p.stock_bodega_ppral = cantidad; }
+            if (p) { 
+                p.nombre = nombre; 
+                p.stock_bodega_ppral = cantidad; 
+                p.stock_reservado = reservado; 
+                p.costo_neto = costoNeto;
+                
+                // Actualizar o inicializar el precio base en la lista
+                if (!p.precios_lista) p.precios_lista = {};
+                p.precios_lista['Precios base'] = {
+                    precio_neto: precioNeto,
+                    precio_total: Math.round(precioNeto * 1.19, 0)
+                };
+                if (!p.listas) p.listas = [];
+                if (!p.listas.includes('Precios base')) p.listas.push('Precios base');
+            }
             filtrar();
         } else {
             errEl.textContent = json.message || 'Error al guardar.';
@@ -689,9 +833,10 @@ async function abrirVer(sku, listaFiltro) {
             </div>`).join('');
 
         document.getElementById('verStock').innerHTML = [
-            ['Bodega Independencia', fmtN(p.stock_bodega_ppral) + ' ' + (p.unidad||'')],
+            ['Stock físico (Bodega)', fmtN(p.stock_bodega_ppral) + ' ' + (p.unidad||'')],
+            ['Stock disponible',     fmtN(Math.max(0, parseFloat(p.stock_bodega_ppral) - parseFloat(p.stock_reservado))) + ' ' + (p.unidad||'')],
+            ['Stock reservado',      fmtN(p.stock_reservado)    + ' ' + (p.unidad||'')],
             ['Ditron (sec.)',        fmtN(p.stock_bodega_sec)   + ' ' + (p.unidad||'')],
-            ['Reservado',           fmtN(p.stock_reservado)    + ' ' + (p.unidad||'')],
             ['Stock mínimo',        fmtN(p.stock_minimo)        + ' ' + (p.unidad||'')],
         ].map(([l,v]) => `
             <div class="detail-row">
@@ -759,6 +904,208 @@ async function confirmarEliminar() {
     }
 }
 
+// ── Reservas por Cliente JS ───────────────────────────────────
+let _modalReservasObj = null;
+let _timeoutAutocomplete = null;
+
+function buscarClientesAutocomplete(q) {
+    clearTimeout(_timeoutAutocomplete);
+    const resultsEl = document.getElementById('resAutocompleteResults');
+    resultsEl.style.display = 'none';
+    resultsEl.innerHTML = '';
+    document.getElementById('resRutCliente').value = '';
+
+    if (q.trim().length < 2) return;
+
+    _timeoutAutocomplete = setTimeout(async () => {
+        try {
+            const resp = await fetch(BASE + 'clientes/buscar?q=' + encodeURIComponent(q));
+            const data = await resp.json();
+            
+            if (data && data.length > 0) {
+                resultsEl.innerHTML = data.map(c => {
+                    const text = `${c.nombre || c.razon_social} (${c.rut})`;
+                    return `<div class="p-2 border-bottom autocomplete-item" style="cursor:pointer; font-size:.80rem;" onclick="seleccionarClienteAutocomplete('${c.rut}', '${(c.nombre || c.razon_social).replace(/'/g, "\\'")}')">${text}</div>`;
+                }).join('');
+                resultsEl.style.display = 'block';
+            } else {
+                resultsEl.innerHTML = '<div class="p-2 text-muted" style="font-size:.80rem;">Sin resultados</div>';
+                resultsEl.style.display = 'block';
+            }
+        } catch (e) {
+            console.error('Error fetching autocomplete:', e);
+        }
+    }, 300);
+}
+
+function seleccionarClienteAutocomplete(rut, nombre) {
+    document.getElementById('resBuscarCliente').value = `${nombre} (${rut})`;
+    document.getElementById('resRutCliente').value = rut;
+    document.getElementById('resAutocompleteResults').style.display = 'none';
+}
+
+async function abrirSubModalReservas() {
+    if (!_skuEditar) return;
+    
+    document.getElementById('resSku').textContent = _skuEditar;
+    const prodNombre = document.getElementById('editNombre').value;
+    document.getElementById('resProductoNombre').textContent = prodNombre || '--';
+    
+    document.getElementById('resBuscarCliente').value = '';
+    document.getElementById('resRutCliente').value = '';
+    document.getElementById('resCantidad').value = '';
+    document.getElementById('resError').style.display = 'none';
+    document.getElementById('resAutocompleteResults').style.display = 'none';
+    
+    if (!_modalReservasObj) {
+        _modalReservasObj = new bootstrap.Modal(document.getElementById('modalReservasCliente'));
+    }
+    _modalReservasObj.show();
+    
+    await cargarReservasCliente(_skuEditar);
+}
+
+async function cargarReservasCliente(sku) {
+    const tbody = document.getElementById('tbodyReservasCliente');
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Cargando reservas...</td></tr>';
+    
+    try {
+        const resp = await fetch(BASE + 'bodega/reservas/' + encodeURIComponent(sku));
+        const json = await resp.json();
+        
+        if (json.success && json.reservas.length > 0) {
+            tbody.innerHTML = json.reservas.map(r => {
+                const nombre = r.nombre_cliente || 'Cliente sin nombre';
+                const rut = r.rut_cliente;
+                const cant = parseFloat(r.cantidad) || 0;
+                
+                return `
+                <tr>
+                    <td class="ps-3">
+                        <div style="font-weight:600; color:#1e293b;">${nombre}</div>
+                        <div style="font-size:.70rem; color:#94a3b8;">${rut}</div>
+                    </td>
+                    <td class="text-end font-monospace pe-3" style="font-weight:700; color:#4c1d95;">${fmtN(cant)}</td>
+                    <td class="text-center">
+                        <div class="d-flex gap-1 justify-content-center">
+                            <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:.70rem;" onclick="descontarReservaPrompt(${r.id}, ${cant}, '${sku}')">
+                                <i class="bi bi-dash-circle"></i> Descontar
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:.70rem;" onclick="eliminarReservaCliente(${r.id}, '${sku}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-muted"><i class="bi bi-info-circle me-1"></i>Sin reservas activas para este producto.</td></tr>';
+        }
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-3 text-danger"><i class="bi bi-x-circle me-1"></i>Error al cargar reservas.</td></tr>';
+    }
+}
+
+async function guardarNuevaReserva() {
+    const sku = _skuEditar;
+    const rut = document.getElementById('resRutCliente').value;
+    const cantidad = parseFloat(document.getElementById('resCantidad').value);
+    const errEl = document.getElementById('resError');
+    errEl.style.display = 'none';
+
+    if (!sku) return;
+    if (!rut) { errEl.textContent = 'Seleccione un cliente válido de la lista.'; errEl.style.display = 'block'; return; }
+    if (!cantidad || cantidad <= 0) { errEl.textContent = 'La cantidad debe ser mayor a 0.'; errEl.style.display = 'block'; return; }
+
+    try {
+        const resp = await fetch(BASE + 'bodega/reservas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sku, rut_cliente: rut, cantidad })
+        });
+        const json = await resp.json();
+        
+        if (json.success) {
+            document.getElementById('editReservado').value = json.stock_reservado;
+            
+            const p = _todos.find(x => x.sku === sku);
+            if (p) p.stock_reservado = json.stock_reservado;
+            
+            await cargarReservasCliente(sku);
+            
+            document.getElementById('resBuscarCliente').value = '';
+            document.getElementById('resRutCliente').value = '';
+            document.getElementById('resCantidad').value = '';
+            
+            filtrar();
+        } else {
+            errEl.textContent = json.message || 'Error al guardar la reserva.';
+            errEl.style.display = 'block';
+        }
+    } catch (e) {
+        errEl.textContent = 'Error de conexión.'; errEl.style.display = 'block';
+    }
+}
+
+async function descontarReservaPrompt(id, cantActual, sku) {
+    const input = prompt(`Descontar cantidad de la reserva:\nCantidad actual: ${fmtN(cantActual)}\n\nIngresa la cantidad a restar:`);
+    if (input === null) return;
+    const cantidad = parseFloat(input);
+    if (isNaN(cantidad) || cantidad <= 0) {
+        alert('Cantidad inválida.');
+        return;
+    }
+
+    try {
+        const resp = await fetch(BASE + 'bodega/reservas/descontar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_reserva: id, cantidad })
+        });
+        const json = await resp.json();
+        
+        if (json.success) {
+            document.getElementById('editReservado').value = json.stock_reservado;
+            
+            const p = _todos.find(x => x.sku === sku);
+            if (p) p.stock_reservado = json.stock_reservado;
+            
+            await cargarReservasCliente(sku);
+            filtrar();
+        } else {
+            alert(json.message || 'Error al descontar stock.');
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
+async function eliminarReservaCliente(id, sku) {
+    if (!confirm('¿Está seguro de eliminar esta reserva por completo?')) return;
+
+    try {
+        const resp = await fetch(BASE + 'bodega/reservas/' + id, {
+            method: 'DELETE'
+        });
+        const json = await resp.json();
+        
+        if (json.success) {
+            document.getElementById('editReservado').value = json.stock_reservado;
+            
+            const p = _todos.find(x => x.sku === sku);
+            if (p) p.stock_reservado = json.stock_reservado;
+            
+            await cargarReservasCliente(sku);
+            filtrar();
+        } else {
+            alert(json.message || 'Error al eliminar reserva.');
+        }
+    } catch(e) {
+        alert('Error de conexión.');
+    }
+}
+
 // ── Init ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
     const u      = window.ADMIN_SESSION || {};
@@ -772,6 +1119,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Seleccionar Precios base por defecto
     document.getElementById('filtroLista').value = 'Precios base';
     cargarProductos();
+
+    // Fix de scroll para sub-modales
+    const subModalEl = document.getElementById('modalReservasCliente');
+    if (subModalEl) {
+        subModalEl.addEventListener('hidden.bs.modal', function () {
+            if (document.getElementById('modalEditar').classList.contains('show')) {
+                document.body.classList.add('modal-open');
+                document.body.style.overflow = 'hidden';
+            }
+        });
+    }
 });
 
 function abrirModalAdmin() {

@@ -138,8 +138,30 @@ class ListaPreciosModel extends Model
     private function toDecimal($v): ?float
     {
         if ($v === null || $v === '') return null;
-        $v = str_replace(['$', ' ', '.'], '', (string)$v);
-        $v = str_replace(',', '.', $v);
+        if (is_float($v) || is_int($v)) return round((float)$v, 2);
+        
+        $v = trim((string)$v);
+        $v = str_replace(['$', ' '], '', $v);
+        
+        if (strpos($v, ',') !== false && strpos($v, '.') !== false) {
+            if (strrpos($v, ',') > strrpos($v, '.')) {
+                $v = str_replace('.', '', $v);
+                $v = str_replace(',', '.', $v);
+            } else {
+                $v = str_replace(',', '', $v);
+            }
+        } elseif (strpos($v, ',') !== false) {
+            if (substr_count($v, ',') > 1) {
+                $v = str_replace(',', '', $v);
+            } else {
+                $v = str_replace(',', '.', $v);
+            }
+        } elseif (strpos($v, '.') !== false) {
+            if (substr_count($v, '.') > 1) {
+                $v = str_replace('.', '', $v);
+            }
+        }
+        
         return is_numeric($v) ? round((float)$v, 2) : null;
     }
 }

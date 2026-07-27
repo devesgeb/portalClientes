@@ -334,7 +334,7 @@ class BalanceDiario extends BaseController
 
         $db = \Config\Database::connect();
         $query = $db->query(
-            "SELECT COUNT(*) AS total, GROUP_CONCAT(DISTINCT COALESCE(c.razon_social, c.nombre, d.rut_cliente) ORDER BY 1 SEPARATOR ', ') AS clientes
+            "SELECT COUNT(*) AS total, GROUP_CONCAT(DISTINCT COALESCE(c.nombre, c.razon_social, d.rut_cliente) ORDER BY 1 SEPARATOR ', ') AS clientes
              FROM tbl_documentos_cobrar d
              LEFT JOIN tbl_clientes c ON c.rut = d.rut_cliente
              WHERE d.numero = ?",
@@ -408,6 +408,39 @@ class BalanceDiario extends BaseController
     }
 
     /**
+     * POST /clientes/buscar-por-ruts
+     * Recibe una lista de RUTs y devuelve un mapeo de RUT -> Nombre del Cliente.
+     */
+    public function buscarClientesPorRuts(): ResponseInterface
+    {
+        $body = $this->request->getJSON(true);
+        $ruts = $body['ruts'] ?? [];
+
+        if (empty($ruts) || !is_array($ruts)) {
+            return $this->response->setJSON([]);
+        }
+
+        $rutsLimpios = array_map(function ($rut) {
+            return trim($rut);
+        }, $ruts);
+
+        $db = \Config\Database::connect();
+        $builder = $db->table('tbl_clientes');
+        $results = $builder->select('rut, nombre, razon_social')
+            ->whereIn('rut', $rutsLimpios)
+            ->get()
+            ->getResultArray();
+
+        $mapeo = [];
+        foreach ($results as $row) {
+            $rut = $row['rut'];
+            $mapeo[$rut] = !empty($row['nombre']) ? $row['nombre'] : (!empty($row['razon_social']) ? $row['razon_social'] : $rut);
+        }
+
+        return $this->response->setJSON($mapeo);
+    }
+
+    /**
      * GET /proveedores/buscar?q=texto
      */
     public function buscarProveedores(): ResponseInterface
@@ -431,5 +464,137 @@ class BalanceDiario extends BaseController
             ->getResultArray();
 
         return $this->response->setJSON($results);
+    }
+
+    // ── ABONOS Cuentas por Pagar ──────────────────────────────────────────────
+
+    /**
+     * GET /cuentas-pagar/abonos?doc_id=X
+     * Lista los abonos de un documento.
+     */
+    public function listarAbonos(): ResponseInterface
+    {
+        $docId = (int)($this->request->getGet('doc_id') ?? 0);
+        if ($docId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'success' => false, 'message' => 'doc_id requerido.',
+            ]);
+        }
+        $model = new \App\Models\CuentasPagarModel();
+        $abonos = $model->obtenerAbonos($docId);
+        return $this->response->setJSON(['success' => true, 'abonos' => $abonos]);
+    }
+
+    /**
+     * POST /cuentas-pagar/abonos
+     * Body: { doc_id, monto, fecha, comentario }
+     */
+    public function registrarAbono(): ResponseInterface
+    {
+        $body      = $this->request->getJSON(true);
+        $docId     = (int)($body['doc_id'] ?? 0);
+        $monto     = (float)($body['monto'] ?? 0);
+        $fecha     = trim($body['fecha'] ?? '');
+        $comentario = trim($body['comentario'] ?? '');
+
+        if ($docId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'doc_id requerido.']);
+        }
+        if ($monto <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'El monto debe ser mayor a 0.']);
+        }
+        if (empty($fecha)) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'La fecha es requerida.']);
+        }
+
+        // Parsear fecha al formato Y-m-d
+        $fechaFmt = null;
+        foreach (['Y-m-d', 'd-m-Y', 'd/m/Y', 'm/d/Y'] as $fmt) {
+            $dt = \DateTime::createFromFormat($fmt, $fecha);
+            if ($dt !== false) { $fechaFmt = $dt->format('Y-m-d'); break; }
+        }
+        if (!$fechaFmt) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Formato de fecha inválido.']);
+        }
+
+        try {
+            $model   = new \App\Models\CuentasPagarModel();
+            $abonoId = $model->registrarAbono($docId, $monto, $fechaFmt, $comentario);
+            $abonos  = $model->obtenerAbonos($docId);
+
+            // Calcular nuevo pagado/impago para retornar al frontend
+            $doc = \Config\Database::connect()
+                ->table('tbl_documentos_pagar')->where('id', $docId)->get()->getRowArray();
+
+            return $this->response->setStatusCode(201)->setJSON([
+                'success'    => true,
+                'abono_id'   => $abonoId,
+                'abonos'     => $abonos,
+                'pagado'     => (float)($doc['pagado'] ?? 0),
+                'impago'     => (float)($doc['impago'] ?? 0),
+                'message'    => 'Abono registrado correctamente.',
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', '[BalanceDiario::registrarAbono] ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * DELETE /cuentas-pagar/abonos/:id
+     */
+    public function eliminarAbono(int $abonoId): ResponseInterface
+    {
+        try {
+            $model = new \App\Models\CuentasPagarModel();
+
+            // Obtener doc_id antes de eliminar para devolver saldos actualizados
+            $abono = \Config\Database::connect()
+                ->table('tbl_abonos_pagar')->where('id', $abonoId)->get()->getRowArray();
+            if (!$abono) {
+                return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Abono no encontrado.']);
+            }
+            $docId = (int)$abono['doc_id'];
+
+            $ok = $model->eliminarAbono($abonoId);
+            if (!$ok) {
+                return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => 'Error al eliminar abono.']);
+            }
+
+            $abonos = $model->obtenerAbonos($docId);
+            $doc = \Config\Database::connect()
+                ->table('tbl_documentos_pagar')->where('id', $docId)->get()->getRowArray();
+
+            return $this->response->setJSON([
+                'success' => true,
+                'abonos'  => $abonos,
+                'pagado'  => (float)($doc['pagado'] ?? 0),
+                'impago'  => (float)($doc['impago'] ?? 0),
+                'message' => 'Abono eliminado correctamente.',
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', '[BalanceDiario::eliminarAbono] ' . $e->getMessage());
+            return $this->response->setStatusCode(500)->setJSON(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * PATCH /cuentas-pagar/comentario-doc
+     * Body: { doc_id, comentario }
+     */
+    public function actualizarComentarioDoc(): ResponseInterface
+    {
+        $body       = $this->request->getJSON(true);
+        $docId      = (int)($body['doc_id'] ?? 0);
+        $comentario = trim($body['comentario'] ?? '');
+
+        if ($docId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'doc_id requerido.']);
+        }
+
+        $model = new \App\Models\CuentasPagarModel();
+        $model->actualizarComentarioDoc($docId, $comentario);
+
+        return $this->response->setJSON(['success' => true, 'message' => 'Comentario actualizado.']);
     }
 }

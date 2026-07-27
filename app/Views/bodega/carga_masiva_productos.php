@@ -537,7 +537,7 @@ function procesarArchivoFile(file, tipo) {
     const reader = new FileReader();
     reader.onload = function(e) {
         const wb   = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true });
 
         // Filtrar filas sin SKU
         const clean = rows.filter(r => {

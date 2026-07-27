@@ -96,12 +96,46 @@ class BodegaController extends BaseController
         $datos = [];
         if (isset($body['nombre'])           && trim($body['nombre']) !== '') $datos['nombre'] = trim($body['nombre']);
         if (isset($body['stock_bodega_ppral']))                               $datos['stock_bodega_ppral'] = (float) $body['stock_bodega_ppral'];
+        if (isset($body['stock_reservado']))                                  $datos['stock_reservado'] = (float) $body['stock_reservado'];
+        if (isset($body['costo_neto']))                                       $datos['costo_neto'] = (float) $body['costo_neto'];
 
-        if (empty($datos)) {
+        if (empty($datos) && !isset($body['precio_venta_neto'])) {
             return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Nada que actualizar.']);
         }
 
-        $db->table('tbl_productos')->where('sku', $sku)->update($datos);
+        if (!empty($datos)) {
+            $db->table('tbl_productos')->where('sku', $sku)->update($datos);
+        }
+
+        // Actualizar o insertar lista de precio 'Precios base'
+        if (isset($body['precio_venta_neto'])) {
+            $precioNeto = (float) $body['precio_venta_neto'];
+            $precioTotal = round($precioNeto * 1.19, 0);
+
+            $existeLista = $db->table('tbl_listaPrecios')
+                              ->where('sku', $sku)
+                              ->where('lista', 'Precios base')
+                              ->countAllResults();
+
+            if ($existeLista) {
+                $db->table('tbl_listaPrecios')
+                   ->where('sku', $sku)
+                   ->where('lista', 'Precios base')
+                   ->update([
+                       'precio_neto' => $precioNeto,
+                       'precio_total' => $precioTotal,
+                       'activo' => 1
+                   ]);
+            } else {
+                $db->table('tbl_listaPrecios')->insert([
+                    'sku' => $sku,
+                    'lista' => 'Precios base',
+                    'precio_neto' => $precioNeto,
+                    'precio_total' => $precioTotal,
+                    'activo' => 1
+                ]);
+            }
+        }
 
         return $this->response->setJSON(['success' => true, 'message' => 'Producto actualizado correctamente.']);
     }
@@ -285,5 +319,139 @@ class BodegaController extends BaseController
             ->setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->setHeader('Content-Disposition', 'attachment; filename="plantilla_lista_de_precios.xlsx"')
             ->setBody(file_get_contents($file));
+    }
+
+    // ── GET /bodega/reservas/{sku} — Obtener reservas por SKU ──────────
+    public function getReservas(string $sku): ResponseInterface
+    {
+        $db = \Config\Database::connect();
+        $reservas = $db->table('tbl_productos_reservas r')
+                       ->select('r.id, r.sku, r.rut_cliente, r.cantidad, c.nombre AS nombre_cliente')
+                       ->join('tbl_clientes c', 'c.rut = r.rut_cliente', 'left')
+                       ->where('r.sku', $sku)
+                       ->orderBy('c.nombre', 'ASC')
+                       ->get()->getResultArray();
+
+        return $this->response->setJSON(['success' => true, 'reservas' => $reservas]);
+    }
+
+    // ── POST /bodega/reservas — Guardar/Crear reserva para un cliente ──
+    public function guardarReserva(): ResponseInterface
+    {
+        $body = $this->request->getJSON(true);
+        $sku = $body['sku'] ?? '';
+        $rut = trim($body['rut_cliente'] ?? '');
+        $cantidad = (float) ($body['cantidad'] ?? 0);
+
+        if (empty($sku) || empty($rut) || $cantidad < 0) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Parámetros inválidos.']);
+        }
+
+        $db = \Config\Database::connect();
+        $p = $db->table('tbl_productos')->where('sku', $sku)->get()->getRowArray();
+        if (!$p) {
+            return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Producto no encontrado.']);
+        }
+
+        $c = $db->table('tbl_clientes')->where('rut', $rut)->get()->getRowArray();
+        if (!$c) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Cliente no registrado en el sistema.']);
+        }
+
+        $existe = $db->table('tbl_productos_reservas')
+                     ->where('sku', $sku)
+                     ->where('rut_cliente', $rut)
+                     ->get()->getRowArray();
+
+        if ($existe) {
+            $db->table('tbl_productos_reservas')
+               ->where('id', $existe['id'])
+               ->update(['cantidad' => $cantidad]);
+        } else {
+            $db->table('tbl_productos_reservas')->insert([
+                'sku' => $sku,
+                'rut_cliente' => $rut,
+                'cantidad' => $cantidad
+            ]);
+        }
+
+        $total = $db->table('tbl_productos_reservas')
+                    ->where('sku', $sku)
+                    ->selectSum('cantidad')
+                    ->get()->getRowArray()['cantidad'] ?? 0;
+
+        $db->table('tbl_productos')->where('sku', $sku)->update(['stock_reservado' => $total]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Reserva guardada correctamente.',
+            'stock_reservado' => $total
+        ]);
+    }
+
+    // ── POST /bodega/reservas/descontar — Descontar stock de una reserva ─
+    public function descontarReserva(): ResponseInterface
+    {
+        $body = $this->request->getJSON(true);
+        $id = (int) ($body['id_reserva'] ?? 0);
+        $cantidadRestar = (float) ($body['cantidad'] ?? 0);
+
+        if ($id <= 0 || $cantidadRestar <= 0) {
+            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Parámetros inválidos.']);
+        }
+
+        $db = \Config\Database::connect();
+        $reserva = $db->table('tbl_productos_reservas')->where('id', $id)->get()->getRowArray();
+        if (!$reserva) {
+            return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Reserva no encontrada.']);
+        }
+
+        $sku = $reserva['sku'];
+        $nuevaCantidad = max(0.000, ((float) $reserva['cantidad']) - $cantidadRestar);
+
+        if ($nuevaCantidad <= 0) {
+            $db->table('tbl_productos_reservas')->where('id', $id)->delete();
+        } else {
+            $db->table('tbl_productos_reservas')->where('id', $id)->update(['cantidad' => $nuevaCantidad]);
+        }
+
+        $total = $db->table('tbl_productos_reservas')
+                    ->where('sku', $sku)
+                    ->selectSum('cantidad')
+                    ->get()->getRowArray()['cantidad'] ?? 0;
+
+        $db->table('tbl_productos')->where('sku', $sku)->update(['stock_reservado' => $total]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Stock descontado correctamente.',
+            'stock_reservado' => $total
+        ]);
+    }
+
+    // ── DELETE /bodega/reservas/{id} — Eliminar reserva ──────────────────
+    public function eliminarReserva(int $id): ResponseInterface
+    {
+        $db = \Config\Database::connect();
+        $reserva = $db->table('tbl_productos_reservas')->where('id', $id)->get()->getRowArray();
+        if (!$reserva) {
+            return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Reserva no encontrada.']);
+        }
+
+        $sku = $reserva['sku'];
+        $db->table('tbl_productos_reservas')->where('id', $id)->delete();
+
+        $total = $db->table('tbl_productos_reservas')
+                    ->where('sku', $sku)
+                    ->selectSum('cantidad')
+                    ->get()->getRowArray()['cantidad'] ?? 0;
+
+        $db->table('tbl_productos')->where('sku', $sku)->update(['stock_reservado' => $total]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => 'Reserva eliminada correctamente.',
+            'stock_reservado' => $total
+        ]);
     }
 }

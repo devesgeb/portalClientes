@@ -24,7 +24,7 @@ LOCAL_ROOT = os.path.dirname(os.path.abspath(__file__))
 # Archivos/carpetas a excluir siempre
 EXCLUDE = {
     '.git', '.agents', '.github', 'node_modules',
-    '.env.production', 'deploy_ftp.py', '_migrate_to_hosting.py',
+    '.env', '.env.production', 'deploy_ftp.py', '_migrate_to_hosting.py',
     '_test_hosting.py', 'setup_git_hosting.py', '_patch_btn.py',
     'writable',
 }
