@@ -131,11 +131,38 @@ class CuentasCobrarModel extends Model
                 $pagado = (float)($doc['pagado'] ?? 0);
                 $impago = isset($doc['impago']) ? (float)$doc['impago'] : max(0, $total - $pagado);
 
+                // Normalizar Tipo de Documento
+                $tipoDoc = trim((string)($doc['tipo_documento'] ?? $doc['tipo'] ?? 'Factura Electrónica'));
+                if ($tipoDoc === '' || $tipoDoc === '—') {
+                    $tipoDoc = 'Factura Electrónica';
+                }
+
+                // Normalizar Número / Folio
+                $numDoc = trim((string)($doc['numero'] ?? $doc['nro'] ?? ''));
+                if ($numDoc === '—') {
+                    $numDoc = '';
+                }
+
+                // Normalizar Fecha a YYYY-MM-DD
+                $rawFecha = trim((string)($doc['fecha'] ?? ''));
+                $fechaValida = date('Y-m-d');
+                if (!empty($rawFecha) && $rawFecha !== '—') {
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawFecha)) {
+                        $fechaValida = $rawFecha;
+                    } elseif (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/', $rawFecha, $mF)) {
+                        $dd = str_pad($mF[1], 2, '0', STR_PAD_LEFT);
+                        $mm = str_pad($mF[2], 2, '0', STR_PAD_LEFT);
+                        $yy = $mF[3];
+                        if (strlen($yy) === 2) $yy = '20' . $yy;
+                        $fechaValida = "{$yy}-{$mm}-{$dd}";
+                    }
+                }
+
                 $filas[] = [
                     'rut_cliente'    => trim(substr($rut, 0, 20)),
-                    'tipo_documento' => trim(substr($doc['tipo_documento'] ?? 'Sin tipo', 0, 120)),
-                    'fecha'          => $doc['fecha'] ?? date('Y-m-d'),
-                    'numero'         => trim(substr((string)($doc['numero'] ?? ''), 0, 50)),
+                    'tipo_documento' => trim(substr($tipoDoc, 0, 120)),
+                    'fecha'          => $fechaValida,
+                    'numero'         => trim(substr($numDoc, 0, 50)),
                     'total'          => $total,
                     'pagado'         => $pagado,
                     'impago'         => $impago,

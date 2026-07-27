@@ -637,15 +637,16 @@ window.DocumentosModule = (function () {
                 const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                 if (!rawData.length || rawData.length < 2) { PortalApp.toast('Archivo vacío', 'warning'); return; }
 
-                // Columnas requeridas: Tipo Documento | Numero | Emisor/Receptor | Rut | Total | Pagado | Impago
+                // Columnas requeridas: Tipo Documento | Numero | Emisor/Receptor | Rut | Fecha | Total | Pagado | Impago
                 const patterns = {
-                    emisor: { regex: /emisor.{0,3}receptor|empresa|razon.?social|cliente|proveedor|receptor|emisor/i },
-                    tipo:   { regex: /tipo.{0,4}doc/i },
-                    nro:    { regex: /^n[uÃº]mero$|^numero$|^nro$|^num$|^nÂ°$/i },
-                    rut:    { regex: /^rut$/i },
-                    total:  { regex: /^total$/i },
-                    pagado: { regex: /^pagado$/i },
-                    impago: { regex: /^impago$|saldo.?pendiente/i },
+                    emisor: { regex: /emisor.{0,3}receptor|empresa|razon.?social|cliente|proveedor|receptor|emisor|nombre/i },
+                    tipo:   { regex: /tipo.{0,4}doc|tipo/i },
+                    nro:    { regex: /^n[uú]mero$|^numero$|^nro$|^num$|^n°$|folio|nro.?doc|numero.?doc/i },
+                    rut:    { regex: /rut|rut.?cliente|rut.?emisor|rut.?receptor/i },
+                    fecha:  { regex: /fecha|f\.?emisi[oó]n|f\.?vencimiento|emisi[oó]n|f_emision|f\.doc/i },
+                    total:  { regex: /total|monto.?total|monto|valor|monto.?doc/i },
+                    pagado: { regex: /pagado|monto.?pagado|abono/i },
+                    impago: { regex: /impago|saldo.?pendiente|monto.?impago|saldo|deuda|pendiente/i },
                 };
                 const allRegex = Object.values(patterns).map(p => p.regex);
 
@@ -675,6 +676,52 @@ window.DocumentosModule = (function () {
                     return;
                 }
 
+                const parseNum = v => {
+                    if (v === null || v === undefined || v === '') return 0;
+                    if (typeof v === 'number') return v;
+                    let s = String(v).trim().replace(/[\$\s]/g, '');
+                    if (!s) return 0;
+                    if (s.includes('.') && s.includes(',')) {
+                        s = s.replace(/\./g, '').replace(',', '.');
+                    } else if (s.includes('.')) {
+                        const parts = s.split('.');
+                        if (parts.length > 2 || (parts.length === 2 && parts[1].length !== 2)) {
+                            s = s.replace(/\./g, '');
+                        }
+                    } else if (s.includes(',')) {
+                        s = s.replace(',', '.');
+                    }
+                    return parseFloat(s) || 0;
+                };
+
+                const parseFecha = v => {
+                    if (!v) return '—';
+                    if (v instanceof Date) {
+                        const yyyy = v.getFullYear();
+                        const mm = String(v.getMonth() + 1).padStart(2, '0');
+                        const dd = String(v.getDate()).padStart(2, '0');
+                        return `${yyyy}-${mm}-${dd}`;
+                    }
+                    let s = String(v).trim();
+                    if (!s) return '—';
+                    if (/^\d{5}$/.test(s)) {
+                        const d = new Date(Math.round((parseInt(s) - 25569) * 86400 * 1000));
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        return `${yyyy}-${mm}-${dd}`;
+                    }
+                    const mDate = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+                    if (mDate) {
+                        const dd = mDate[1].padStart(2, '0');
+                        const mm = mDate[2].padStart(2, '0');
+                        let yyyy = mDate[3];
+                        if (yyyy.length === 2) yyyy = '20' + yyyy;
+                        return `${yyyy}-${mm}-${dd}`;
+                    }
+                    return s;
+                };
+
                 const grupos = {};
                 rows.forEach(row => {
                     const nombre = String(row[colMap.emisor] || '').trim();
@@ -683,13 +730,19 @@ window.DocumentosModule = (function () {
                     const key = rut ? `${nombre}||${rut}` : nombre;
                     if (!grupos[key]) grupos[key] = { nombre, rut, docs: [], impago: 0, pagado: 0 };
 
-                    const parseNum = v => parseFloat(String(v || '0').replace(/[^0-9.\-]/g, '')) || 0;
                     const impago = colMap.impago ? parseNum(row[colMap.impago]) : 0;
                     const pagado = colMap.pagado ? parseNum(row[colMap.pagado]) : 0;
-                    const total = colMap.total ? parseNum(row[colMap.total]) : impago + pagado;
-                    const fecha = colMap.fecha ? String(row[colMap.fecha]) : '—';
-                    const tipo = colMap.tipo ? String(row[colMap.tipo]) : '—';
-                    const nro = colMap.nro ? String(row[colMap.nro]) : '—';
+                    let total    = colMap.total ? parseNum(row[colMap.total]) : 0;
+
+                    if (total === 0 && (impago > 0 || pagado > 0)) {
+                        total = impago + pagado;
+                    }
+                    if (impago === 0 && total > 0 && pagado === 0) {
+                        impago = total;
+                    }
+                    const fecha = colMap.fecha ? parseFecha(row[colMap.fecha]) : '—';
+                    const tipo = colMap.tipo ? String(row[colMap.tipo]).trim() : '—';
+                    const nro = colMap.nro ? String(row[colMap.nro]).trim() : '—';
 
                     grupos[key].docs.push({ tipo, nro, fecha, total, impago, pagado, rut });
                     grupos[key].impago += impago;
