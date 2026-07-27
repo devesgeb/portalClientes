@@ -128,10 +128,10 @@ class FactoController extends BaseController
         $totalItems = (int) ($data['total_items'] ?? count($rawItems));
         $totalPages = (int) ($data['page_count'] ?? 1);
 
-        // Obtener folios del batch para consultar en tbl_facto_pagos y tbl_documentos_cobrar
+        // Obtener folios del batch para consultar en tbl_facto_pagos, tbl_documentos_cobrar y tbl_documentos_pagar
         $foliosBatch = array_filter(array_column($rawItems, 'document_number'));
-        $estadosLocales = [];
-        $pendientesBD   = [];
+        $estadosLocales     = [];
+        $pendientesPorFolio = [];
 
         if (!empty($foliosBatch)) {
             $db = \Config\Database::connect();
@@ -148,28 +148,50 @@ class FactoController extends BaseController
                 ];
             }
 
-            // 2. Consultar documentos pendientes en tbl_documentos_cobrar por folio
+            // 2. Consultar documentos impagos en tbl_documentos_cobrar por numero (folio)
             $builderCobrar = $db->table('tbl_documentos_cobrar')->whereIn('numero', array_map('strval', $foliosBatch));
             $rowsCobrar = $builderCobrar->get()->getResultArray();
             foreach ($rowsCobrar as $c) {
-                $folioC   = (string)$c['numero'];
-                $rutClean = strtolower(preg_replace('/[^0-9kK]/', '', (string)$c['rut_cliente']));
-                $impago   = (float)($c['impago'] ?? 0);
-                $pagado   = (float)($c['pagado'] ?? 0);
+                $folioC = trim((string)$c['numero']);
+                $impago = (float)($c['impago'] ?? 0);
+                $pagado = (float)($c['pagado'] ?? 0);
 
                 if ($impago > 0) {
                     $st = ($pagado > 0) ? 'parcial' : 'pendiente';
-                    $pendientesBD[$folioC . '_' . $rutClean] = [
+                    $pendientesPorFolio[$folioC] = [
                         'estado_pago'  => $st,
                         'monto_pagado' => $pagado,
-                        'impago'       => $impago
+                        'impago'       => $impago,
+                        'observacion'  => 'Cuentas por Cobrar (Deuda Impaga)'
                     ];
+                }
+            }
+
+            // 3. Consultar documentos impagos en tbl_documentos_pagar por numero (folio) si existe
+            if ($db->tableExists('tbl_documentos_pagar')) {
+                $builderPagar = $db->table('tbl_documentos_pagar')->whereIn('numero', array_map('strval', $foliosBatch));
+                $rowsPagar = $builderPagar->get()->getResultArray();
+                foreach ($rowsPagar as $p) {
+                    $folioP = trim((string)$p['numero']);
+                    $impago = (float)($p['impago'] ?? 0);
+                    $pagado = (float)($p['pagado'] ?? 0);
+
+                    if ($impago > 0 && !isset($pendientesPorFolio[$folioP])) {
+                        $st = ($pagado > 0) ? 'parcial' : 'pendiente';
+                        $pendientesPorFolio[$folioP] = [
+                            'estado_pago'  => $st,
+                            'monto_pagado' => $pagado,
+                            'impago'       => $impago,
+                            'observacion'  => 'Cuentas por Pagar (Deuda Impaga)'
+                        ];
+                    }
                 }
             }
         }
 
         $documentos = [];
         $totalMontoBatch = 0;
+        $todayDate = date('Y-m-d'); // 2026-07-27
 
         foreach ($rawItems as $item) {
             $folioDoc = (string) ($item['document_number'] ?? '');
@@ -189,31 +211,34 @@ class FactoController extends BaseController
             $taxBureauCode = (int) ($item['document_type_taxbureau'] ?? 0);
             $tipoNombre = $this->getTipoDteNombre($taxBureauCode);
 
-            $neto = (float) ($item['net_amount'] ?? 0);
-            $iva = (float) ($item['taxes_amount'] ?? 0);
+            $neto  = (float) ($item['net_amount'] ?? 0);
+            $iva   = (float) ($item['taxes_amount'] ?? 0);
             $total = (float) ($item['total_amount'] ?? 0);
+            $docFecha = trim((string)($item['issue_date'] ?? ''));
 
-            // Determinación por Base de Datos:
+            // Determinación por Base de Datos y Fecha:
             // 1. Si existe en tbl_facto_pagos (modificado manualmente), respetar ese estado.
-            // 2. Si existe en tbl_documentos_cobrar con impago > 0, asignar 'pendiente' o 'parcial'.
-            // 3. Si NO existe en tbl_documentos_cobrar (o impago <= 0), marcar como 'pagada' automáticamente.
-            $localKey  = $folioDoc . '_' . $taxBureauCode;
-            $rutClean  = strtolower(preg_replace('/[^0-9kK]/', '', $rutDoc));
-            $cobrarKey = $folioDoc . '_' . $rutClean;
+            // 2. Si es de HOY (27/07/2026), marcar como 'pendiente' (impaga por ser emitida hoy).
+            // 3. Si existe en cuentas por cobrar/pagar con impago > 0, asignar 'pendiente' o 'parcial'.
+            // 4. Si NO existe en cuentas impagas y NO es de hoy, marcar como 'pagada' automáticamente.
+            $localKey = $folioDoc . '_' . $taxBureauCode;
 
             if (isset($estadosLocales[$localKey])) {
                 $estadoPago  = $estadosLocales[$localKey]['estado_pago'];
                 $montoPagado = $estadosLocales[$localKey]['monto_pagado'];
                 $obs         = $estadosLocales[$localKey]['observacion'];
-            } elseif (isset($pendientesBD[$cobrarKey])) {
-                $estadoPago  = $pendientesBD[$cobrarKey]['estado_pago'];
-                $montoPagado = $pendientesBD[$cobrarKey]['monto_pagado'];
-                $obs         = 'Registrado en Cobranza (Impago)';
+            } elseif ($docFecha === $todayDate) {
+                $estadoPago  = 'pendiente';
+                $montoPagado = 0.0;
+                $obs         = 'Emitida hoy (' . $docFecha . ') - Pendiente';
+            } elseif (isset($pendientesPorFolio[$folioDoc])) {
+                $estadoPago  = $pendientesPorFolio[$folioDoc]['estado_pago'];
+                $montoPagado = $pendientesPorFolio[$folioDoc]['monto_pagado'];
+                $obs         = $pendientesPorFolio[$folioDoc]['observacion'];
             } else {
-                // Las que no estén en cuentas por cobrar / pendientes se dejan TODAS PAGADAS automáticamente
                 $estadoPago  = 'pagada';
                 $montoPagado = $total;
-                $obs         = 'Conciliado (Sin deuda en BD)';
+                $obs         = 'Conciliado (Sin deuda impaga)';
             }
 
             // Filtrar si el usuario seleccionó un estado de pago específico
