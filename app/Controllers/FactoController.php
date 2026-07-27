@@ -211,7 +211,8 @@ class FactoController extends BaseController
      */
     public function actualizarEstadoPago(): ResponseInterface
     {
-        $json = $this->request->getJSON(true) ?? $this->request->getPost();
+        $raw  = $this->request->getBody();
+        $json = json_decode($raw, true) ?: $this->request->getPost();
 
         $folio       = trim((string)($json['folio'] ?? ''));
         $codigoSii   = (int)($json['codigo_sii'] ?? 33);
@@ -249,7 +250,8 @@ class FactoController extends BaseController
      */
     public function actualizarEstadoMasivo(): ResponseInterface
     {
-        $json = $this->request->getJSON(true) ?? [];
+        $raw  = $this->request->getBody();
+        $json = json_decode($raw, true) ?: $this->request->getPost();
 
         $documentos  = $json['documentos'] ?? [];
         $nuevoEstado = trim((string)($json['nuevo_estado'] ?? ''));
