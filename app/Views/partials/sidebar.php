@@ -7,7 +7,7 @@
  */
 $activePage = $activePage ?? 'admin';
 $contabOpen = ['balance-diario', 'gastos', 'pagos-mensuales', 'historial-balances'];
-$cobranzaOpen = ['documentos-impago'];
+$cobranzaOpen = ['documentos-impago', 'facturas-facto'];
 $cpOpen = ['cargar-entidad', 'buscar-entidad'];
 $bodegaOpen    = ['productos', 'carga-masiva-productos'];
 $logisticaOpen = ['hoja-de-ruta', 'despachos-agendados', 'funcionarios'];
@@ -77,6 +77,9 @@ function sbOpenClass(array $g, string $active): string
         <div class="sub-nav" id="menuCobranza" class="sub-nav<?= sbOpenClass($cobranzaOpen, $activePage) ?>">
             <a href="<?= site_url('cobranza/documentos-impago') ?>" class="sub-link<?= sbActive('documentos-impago', $activePage) ?>">
                 <i class="bi bi-file-earmark-exclamation-fill"></i> Documentos impago
+            </a>
+            <a href="<?= site_url('cobranza/facturas-facto') ?>" class="sub-link<?= sbActive('facturas-facto', $activePage) ?>">
+                <i class="bi bi-receipt"></i> Facturas Facto
             </a>
         </div>
 

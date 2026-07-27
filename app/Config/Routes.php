@@ -97,6 +97,8 @@ $routes->post('/webhook/tupana', 'WebhookReceiver::receive');
 
 // ── Cobranza ──────────────────────────────────────────────────
 $routes->get('/cobranza/documentos-impago', 'WebhookReceiver::documentosImpago');
+$routes->get('/cobranza/facturas-facto',    'FactoController::facturasFacto');
+$routes->get('/cobranza/facto/buscar-dtes',  'FactoController::buscarDtes');
 
 // ── Logística ──────────────────────────────────────────────────
 $routes->get('/hoja-de-ruta',          'LogisticaController::hojaDeRuta');
