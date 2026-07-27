@@ -99,78 +99,124 @@ class FactoController extends BaseController
             $queryParams['document_type_id'] = $typeIdMap[$tipoDte];
         }
 
-        $rawItems = [];
+        $rawItems   = [];
         $totalItems = 0;
         $totalPages = 1;
-        $todayDate = date('Y-m-d');
+        $todayDate  = date('Y-m-d');
+        $db = \Config\Database::connect();
 
-        // Si se busca 'pendiente' y estamos en la primera página sin rango de fecha cerrado, incluir siempre documentos de HOY primero
-        if ($estadoFiltro === 'pendiente' && $requestedPage === 1 && !$fechaInicio && !$fechaFin) {
-            $todayParams = $queryParams;
-            $todayParams['issue_date_from'] = $todayDate;
-            $todayParams['issue_date_to']   = $todayDate;
-            $todayParams['page']            = 1;
-            
-            $todayUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($todayParams);
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $todayUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-            $resToday = curl_exec($ch);
-            curl_close($ch);
-            if ($resToday) {
-                $dToday = json_decode($resToday, true);
-                $docsToday = $dToday['_embedded']['documents'] ?? $dToday['_embedded']['items'] ?? [];
-                if (!empty($docsToday)) {
-                    $rawItems = array_merge($rawItems, $docsToday);
+        // ── MODO PENDIENTES: Búsqueda acelerada de folios impagos BD + HOY ──
+        if ($estadoFiltro === 'pendiente') {
+            $pendingFoliosList = [];
+
+            // A. Obtener folios impagos de tbl_documentos_cobrar
+            $cobrarFolios = $db->table('tbl_documentos_cobrar')->select('numero')->where('impago >', 0)->get()->getResultArray();
+            foreach ($cobrarFolios as $cf) {
+                $f = trim((string)$cf['numero']);
+                if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
+                    $pendingFoliosList[] = $f;
                 }
             }
-        }
 
-        // Si se aplica un filtro por estado de pago (ej: 'pendiente'), escaneamos varias páginas de Facto API para recopilar suficientes resultados
-        $maxScanPages = ($estadoFiltro !== '') ? 5 : 1;
-        $scanStartPage = ($estadoFiltro !== '') ? (($requestedPage - 1) * 3 + 1) : $requestedPage;
+            // B. Obtener folios impagos de tbl_documentos_pagar si existe
+            if ($db->tableExists('tbl_documentos_pagar')) {
+                $pagarFolios = $db->table('tbl_documentos_pagar')->select('numero')->where('impago >', 0)->get()->getResultArray();
+                foreach ($pagarFolios as $pf) {
+                    $f = trim((string)$pf['numero']);
+                    if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
+                        $pendingFoliosList[] = $f;
+                    }
+                }
+            }
 
-        for ($p = 0; $p < $maxScanPages; $p++) {
-            $currentPageToFetch = $scanStartPage + $p;
+            // C. Traer primero documentos de HOY de Facto API si no hay filtro de fecha cerrado
+            if (!$fechaInicio && !$fechaFin) {
+                $todayParams = $queryParams;
+                $todayParams['issue_date_from'] = $todayDate;
+                $todayParams['issue_date_to']   = $todayDate;
+                $todayParams['page']            = 1;
+
+                $todayUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($todayParams);
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $todayUrl);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
+                $resToday = curl_exec($ch);
+                curl_close($ch);
+                if ($resToday) {
+                    $dToday = json_decode($resToday, true);
+                    $docsToday = $dToday['_embedded']['documents'] ?? $dToday['_embedded']['items'] ?? [];
+                    if (!empty($docsToday)) {
+                        $rawItems = array_merge($rawItems, $docsToday);
+                    }
+                }
+            }
+
+            // D. Consultar folios impagos de la BD vía curl_multi paralelo contra Facto API
+            if (!empty($pendingFoliosList)) {
+                $mh = curl_multi_init();
+                $handles = [];
+                $existingFolios = array_filter(array_column($rawItems, 'document_number'));
+
+                foreach ($pendingFoliosList as $f) {
+                    if (in_array((string)$f, array_map('strval', $existingFolios), true)) continue;
+
+                    $pParams = $queryParams;
+                    $pParams['document_number'] = $f;
+                    $pUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($pParams);
+
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $pUrl);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
+                    curl_multi_add_handle($mh, $ch);
+                    $handles[$f] = $ch;
+                }
+
+                if (!empty($handles)) {
+                    $running = null;
+                    do {
+                        curl_multi_exec($mh, $running);
+                        curl_multi_select($mh, 1);
+                    } while ($running > 0);
+
+                    foreach ($handles as $f => $ch) {
+                        $resP = curl_multi_getcontent($ch);
+                        $dP = json_decode($resP, true);
+                        $dList = $dP['_embedded']['documents'] ?? $dP['_embedded']['items'] ?? [];
+                        if (!empty($dList)) {
+                            foreach ($dList as $docObj) {
+                                $rawItems[] = $docObj;
+                            }
+                        }
+                        curl_multi_remove_handle($mh, $ch);
+                        curl_close($ch);
+                    }
+                }
+                curl_multi_close($mh);
+            }
+        } else {
+            // Modo Normal: Consulta paginada directa a Facto API
             $currentParams = $queryParams;
-            $currentParams['page'] = $currentPageToFetch;
-
+            $currentParams['page'] = $requestedPage;
             $url = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($currentParams);
 
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer {$token}",
-                "Accept: application/json"
-            ]);
-
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             if ($httpCode === 200 && $response) {
                 $data = json_decode($response, true);
-                $pageDocs = $data['_embedded']['documents'] ?? $data['_embedded']['items'] ?? [];
-                if (empty($pageDocs)) break;
-
-                // Evitar duplicados por id/folio
-                $existingIds = array_column($rawItems, 'document_id');
-                foreach ($pageDocs as $pd) {
-                    if (!in_array($pd['document_id'] ?? null, $existingIds, true)) {
-                        $rawItems[] = $pd;
-                    }
-                }
-
+                $rawItems = $data['_embedded']['documents'] ?? $data['_embedded']['items'] ?? [];
                 $totalItems = (int) ($data['total_items'] ?? count($rawItems));
                 $totalPages = (int) ($data['page_count'] ?? 1);
-
-                if ($currentPageToFetch >= $totalPages) break;
-            } else {
-                break;
             }
         }
 
@@ -335,7 +381,11 @@ class FactoController extends BaseController
             $totalCount  = $countResult;
             $calcPages   = (int)ceil($totalCount / 25);
             $totalPages  = max(1, $calcPages);
-            $currentPage = 1;
+            $currentPage = max(1, min($requestedPage, $totalPages));
+
+            // Paginación limpia de los resultados filtrados (25 por página)
+            $offset = ($currentPage - 1) * 25;
+            $documentos = array_slice($documentos, $offset, 25);
         } else {
             $totalCount  = $totalItems;
             $currentPage = (int) ($data['page'] ?? $requestedPage);
