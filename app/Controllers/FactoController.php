@@ -41,6 +41,14 @@ class FactoController extends BaseController
             ]);
         }
 
+        // Mapeo del código de DTE SII a document_type_id nativo de Facto API
+        $typeIdMap = [
+            '33' => 2,   // Facturas Electrónicas
+            '52' => 54,  // Guías de Despacho Electrónicas
+            '39' => 7,   // Boletas Electrónicas
+            '61' => 16,  // Notas de Crédito Electrónicas
+        ];
+
         // Construir query params nativos para Facto API
         $queryParams = [
             'page'                 => $requestedPage,
@@ -53,8 +61,8 @@ class FactoController extends BaseController
         if ($fechaFin) {
             $queryParams['issue_date_to'] = $fechaFin;
         }
-        if ($tipoDte && in_array($tipoDte, ['33', '52', '39', '61'])) {
-            $queryParams['document_type_taxbureau'] = $tipoDte;
+        if ($tipoDte && isset($typeIdMap[$tipoDte])) {
+            $queryParams['document_type_id'] = $typeIdMap[$tipoDte];
         }
 
         $url = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($queryParams);
