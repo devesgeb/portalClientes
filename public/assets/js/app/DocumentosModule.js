@@ -822,6 +822,21 @@ window.DocumentosModule = (function () {
         if (btnEl) btnEl.disabled = false;
     }
 
+    function _normalizeFolio(s) {
+        if (s === null || s === undefined) return '';
+        return String(s).trim().replace(/^0+/, '');
+    }
+
+    function _normalizeTipoDoc(s) {
+        if (!s) return 'factura';
+        const str = String(s).toLowerCase();
+        if (str.includes('factura') || str.includes('33')) return 'factura';
+        if (str.includes('guia') || str.includes('guía') || str.includes('52')) return 'guia';
+        if (str.includes('boleta') || str.includes('39')) return 'boleta';
+        if (str.includes('credito') || str.includes('crédito') || str.includes('61')) return 'credito';
+        return str;
+    }
+
     function importarExcel(cfg) {
         const agrupado = _excelData[cfg.tipo] || [];
         if (!agrupado.length) return;
@@ -840,17 +855,17 @@ window.DocumentosModule = (function () {
             if (existing) {
                 if (!existing.docs) existing.docs = [];
                 c.docs.forEach(newDoc => {
-                    const newNro  = String(newDoc.nro || newDoc.numero || '').trim();
-                    const newTipo = String(newDoc.tipo || newDoc.tipo_documento || '').trim().toLowerCase();
+                    const newNroNorm  = _normalizeFolio(newDoc.nro || newDoc.numero);
+                    const newTipoNorm = _normalizeTipoDoc(newDoc.tipo || newDoc.tipo_documento);
 
                     const docIdx = existing.docs.findIndex(d => {
-                        const dNro  = String(d.nro || d.numero || '').trim();
-                        const dTipo = String(d.tipo || d.tipo_documento || '').trim().toLowerCase();
-                        return (newNro !== '' && dNro === newNro) && (dTipo === newTipo || !newTipo || !dTipo);
+                        const dNroNorm  = _normalizeFolio(d.nro || d.numero);
+                        const dTipoNorm = _normalizeTipoDoc(d.tipo || d.tipo_documento);
+                        return (newNroNorm !== '' && dNroNorm === newNroNorm) && (dTipoNorm === newTipoNorm);
                     });
 
                     if (docIdx !== -1) {
-                        // Reemplazar documento existente para evitar duplicados
+                        // Reemplazar documento existente para evitar duplicados por folio
                         existing.docs[docIdx] = newDoc;
                     } else {
                         // Agregar nuevo documento sin duplicar
