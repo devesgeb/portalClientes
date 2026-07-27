@@ -81,6 +81,15 @@ class FactoController extends BaseController
             'received_issued_flag' => 1 // 1 = Documentos Emitidos
         ];
 
+        if ($numero !== '') {
+            $queryParams['document_number'] = $numero;
+        }
+        if ($cliente !== '') {
+            $cleanRut = preg_replace('/[^0-9kK-]/', '', $cliente);
+            if (!empty($cleanRut)) {
+                $queryParams['receiver_tax_id_code'] = $cleanRut;
+            }
+        }
         if ($fechaInicio) {
             $queryParams['issue_date_from'] = $fechaInicio;
         }
