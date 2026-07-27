@@ -837,60 +837,103 @@ window.DocumentosModule = (function () {
         return str;
     }
 
+    function _normalizeRut(s) {
+        if (!s) return '';
+        return String(s).replace(/[^0-9kK]/g, '').toLowerCase();
+    }
+
+    function _normalizeName(s) {
+        if (!s) return '';
+        return String(s).trim().toLowerCase();
+    }
+
     function importarExcel(cfg) {
         const agrupado = _excelData[cfg.tipo] || [];
         if (!agrupado.length) return;
         let currentDb = [...cfg.db()];
 
         agrupado.forEach(c => {
-            const normRut  = (c.rut || '').replace(/[^0-9kK]/g, '').toLowerCase();
-            const normName = (c.nombre || '').trim().toLowerCase();
+            const normRut  = _normalizeRut(c.rut);
+            const normName = _normalizeName(c.nombre);
 
-            let existing = currentDb.find(r => {
-                const rRut  = (r.rut || '').replace(/[^0-9kK]/g, '').toLowerCase();
-                const rName = (r.nombre || r.cliente || r.proveedor || '').trim().toLowerCase();
-                return (normRut && rRut === normRut) || (normName && rName === normName);
-            });
+            c.docs.forEach(newDoc => {
+                const newNroNorm  = _normalizeFolio(newDoc.nro || newDoc.numero);
+                const newTipoNorm = _normalizeTipoDoc(newDoc.tipo || newDoc.tipo_documento);
 
-            if (existing) {
-                if (!existing.docs) existing.docs = [];
-                c.docs.forEach(newDoc => {
-                    const newNroNorm  = _normalizeFolio(newDoc.nro || newDoc.numero);
-                    const newTipoNorm = _normalizeTipoDoc(newDoc.tipo || newDoc.tipo_documento);
+                if (!newNroNorm) return;
 
-                    const docIdx = existing.docs.findIndex(d => {
+                // Búsqueda GLOBAL: ¿Existe ya este folio en ALGÚN cliente de la tabla?
+                let globalDocOwner = null;
+                let globalDocIdx   = -1;
+
+                for (let r of currentDb) {
+                    if (!r.docs) continue;
+                    const idx = r.docs.findIndex(d => {
                         const dNroNorm  = _normalizeFolio(d.nro || d.numero);
                         const dTipoNorm = _normalizeTipoDoc(d.tipo || d.tipo_documento);
-                        return (newNroNorm !== '' && dNroNorm === newNroNorm) && (dTipoNorm === newTipoNorm);
+                        return dNroNorm === newNroNorm && (dTipoNorm === newTipoNorm || !newTipoNorm);
+                    });
+                    if (idx !== -1) {
+                        globalDocOwner = r;
+                        globalDocIdx   = idx;
+                        break;
+                    }
+                }
+
+                if (globalDocOwner) {
+                    // Actualizar el documento existente en su cliente actual
+                    globalDocOwner.docs[globalDocIdx] = newDoc;
+                } else {
+                    // Si no existe en ningún cliente, buscar o crear el cliente destino
+                    let targetClient = currentDb.find(r => {
+                        const rRut  = _normalizeRut(r.rut);
+                        const rName = _normalizeName(r.nombre || r.cliente || r.proveedor);
+                        return (normRut && rRut === normRut) || (normName && rName === normName);
                     });
 
-                    if (docIdx !== -1) {
-                        // Reemplazar documento existente para evitar duplicados por folio
-                        existing.docs[docIdx] = newDoc;
-                    } else {
-                        // Agregar nuevo documento sin duplicar
-                        existing.docs.push(newDoc);
+                    if (!targetClient) {
+                        targetClient = {
+                            id: cfg.incId(),
+                            nombre: c.nombre,
+                            cliente: c.nombre,
+                            proveedor: c.nombre,
+                            rut: c.rut,
+                            monto: 0,
+                            docs: [],
+                            enBD: false,
+                        };
+                        currentDb.push(targetClient);
+                    }
+
+                    if (!targetClient.docs) targetClient.docs = [];
+                    targetClient.docs.push(newDoc);
+                }
+            });
+        });
+
+        // Recalcular montos y filtrar clientes vacíos o documentos duplicados internos
+        currentDb.forEach(r => {
+            if (r.docs) {
+                const uniqueDocs = [];
+                const seenKeys   = new Set();
+                r.docs.forEach(d => {
+                    const key = _normalizeFolio(d.nro || d.numero) + '_' + _normalizeTipoDoc(d.tipo || d.tipo_documento);
+                    if (!seenKeys.has(key)) {
+                        seenKeys.add(key);
+                        uniqueDocs.push(d);
                     }
                 });
-                existing.monto = existing.docs.reduce((s, d) => s + (d.impago ?? d.monto ?? d.total ?? 0), 0);
-            } else {
-                currentDb.push({
-                    id: cfg.incId(),
-                    nombre: c.nombre,
-                    cliente: c.nombre,
-                    proveedor: c.nombre,
-                    rut: c.rut,
-                    monto: c.docs.reduce((s, d) => s + (d.impago ?? d.monto ?? d.total ?? 0), 0),
-                    docs: [...c.docs],
-                    enBD: false,
-                });
+                r.docs  = uniqueDocs;
+                r.monto = r.docs.reduce((s, d) => s + (d.impago ?? d.monto ?? d.total ?? 0), 0);
             }
         });
+
+        currentDb = currentDb.filter(r => r.docs && r.docs.length > 0);
 
         cfg.setDb(currentDb);
         renderTabla(cfg);
         PortalApp.hideModal(cfg.modalExcel);
-        PortalApp.toast(`Importación completada sin duplicar registros.`, 'success');
+        PortalApp.toast(`Importación completada. Se eliminaron folios duplicados.`, 'success');
         _limpiarExcel(cfg);
     }
 
