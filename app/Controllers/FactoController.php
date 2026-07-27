@@ -37,9 +37,9 @@ class FactoController extends BaseController
     public function facturasFacto()
     {
         return view('cobranza/facturas_facto', [
-            'title'      => 'Facturas y Guías Facto',
+            'title' => 'Facturas y Guías Facto',
             'activePage' => 'facturas-facto',
-            'base_url'   => base_url(),
+            'base_url' => base_url(),
             'assets_url' => base_url('public/assets/'),
         ]);
     }
@@ -50,13 +50,13 @@ class FactoController extends BaseController
      */
     public function buscarDtes(): ResponseInterface
     {
-        $fechaInicio   = $this->request->getGet('fecha_inicio');
-        $fechaFin      = $this->request->getGet('fecha_fin');
-        $numero        = trim((string)($this->request->getGet('numero') ?? ''));
-        $cliente       = trim((string)($this->request->getGet('cliente') ?? ''));
-        $tipoDte       = trim((string)($this->request->getGet('tipo_dte') ?? ''));
-        $estadoFiltro  = trim((string)($this->request->getGet('estado_pago') ?? '')); // filtro por estado de pago
-        $requestedPage = (int)($this->request->getGet('page') ?: 1);
+        $fechaInicio = $this->request->getGet('fecha_inicio');
+        $fechaFin = $this->request->getGet('fecha_fin');
+        $numero = trim((string) ($this->request->getGet('numero') ?? ''));
+        $cliente = trim((string) ($this->request->getGet('cliente') ?? ''));
+        $tipoDte = trim((string) ($this->request->getGet('tipo_dte') ?? ''));
+        $estadoFiltro = trim((string) ($this->request->getGet('estado_pago') ?? '')); // filtro por estado de pago
+        $requestedPage = (int) ($this->request->getGet('page') ?: 1);
 
         $token = $this->getFactoToken();
 
@@ -77,7 +77,7 @@ class FactoController extends BaseController
 
         // Construir query params nativos para Facto API
         $queryParams = [
-            'page'                 => $requestedPage,
+            'page' => $requestedPage,
             'received_issued_flag' => 1 // 1 = Documentos Emitidos
         ];
 
@@ -116,24 +116,46 @@ class FactoController extends BaseController
 
         $data = json_decode($response, true);
         $rawItems = $data['_embedded']['documents'] ?? $data['_embedded']['items'] ?? [];
-        $totalItems = (int)($data['total_items'] ?? count($rawItems));
-        $totalPages = (int)($data['page_count'] ?? 1);
+        $totalItems = (int) ($data['total_items'] ?? count($rawItems));
+        $totalPages = (int) ($data['page_count'] ?? 1);
 
-        // Obtener folios del batch para buscar sus estados en tbl_facto_pagos
+        // Obtener folios del batch para consultar en tbl_facto_pagos y tbl_documentos_cobrar
         $foliosBatch = array_filter(array_column($rawItems, 'document_number'));
         $estadosLocales = [];
+        $pendientesBD   = [];
 
         if (!empty($foliosBatch)) {
             $db = \Config\Database::connect();
+
+            // 1. Cargar overrides o estados guardados explícitamente en tbl_facto_pagos
             $builder = $db->table('tbl_facto_pagos')->whereIn('folio', array_map('strval', $foliosBatch));
             $rows = $builder->get()->getResultArray();
             foreach ($rows as $r) {
                 $key = $r['folio'] . '_' . $r['codigo_sii'];
                 $estadosLocales[$key] = [
                     'estado_pago'  => $r['estado_pago'],
-                    'monto_pagado' => (float)$r['monto_pagado'],
+                    'monto_pagado' => (float) $r['monto_pagado'],
                     'observacion'  => $r['observacion']
                 ];
+            }
+
+            // 2. Consultar documentos pendientes en tbl_documentos_cobrar por folio
+            $builderCobrar = $db->table('tbl_documentos_cobrar')->whereIn('numero', array_map('strval', $foliosBatch));
+            $rowsCobrar = $builderCobrar->get()->getResultArray();
+            foreach ($rowsCobrar as $c) {
+                $folioC   = (string)$c['numero'];
+                $rutClean = strtolower(preg_replace('/[^0-9kK]/', '', (string)$c['rut_cliente']));
+                $impago   = (float)($c['impago'] ?? 0);
+                $pagado   = (float)($c['pagado'] ?? 0);
+
+                if ($impago > 0) {
+                    $st = ($pagado > 0) ? 'parcial' : 'pendiente';
+                    $pendientesBD[$folioC . '_' . $rutClean] = [
+                        'estado_pago'  => $st,
+                        'monto_pagado' => $pagado,
+                        'impago'       => $impago
+                    ];
+                }
             }
         }
 
@@ -141,13 +163,13 @@ class FactoController extends BaseController
         $totalMontoBatch = 0;
 
         foreach ($rawItems as $item) {
-            $folioDoc = (string)($item['document_number'] ?? '');
+            $folioDoc = (string) ($item['document_number'] ?? '');
             if ($numero !== '' && strpos($folioDoc, $numero) === false) {
                 continue;
             }
 
-            $rutDoc = (string)($item['receiver_tax_id_code'] ?? '');
-            $nombreDoc = (string)($item['receiver_legal_name'] ?? '');
+            $rutDoc = (string) ($item['receiver_tax_id_code'] ?? '');
+            $nombreDoc = (string) ($item['receiver_legal_name'] ?? '');
             if ($cliente !== '') {
                 $qLower = strtolower($cliente);
                 if (strpos(strtolower($rutDoc), $qLower) === false && strpos(strtolower($nombreDoc), $qLower) === false) {
@@ -155,18 +177,35 @@ class FactoController extends BaseController
                 }
             }
 
-            $taxBureauCode = (int)($item['document_type_taxbureau'] ?? 0);
+            $taxBureauCode = (int) ($item['document_type_taxbureau'] ?? 0);
             $tipoNombre = $this->getTipoDteNombre($taxBureauCode);
 
-            $neto  = (float)($item['net_amount'] ?? 0);
-            $iva   = (float)($item['taxes_amount'] ?? 0);
-            $total = (float)($item['total_amount'] ?? 0);
+            $neto = (float) ($item['net_amount'] ?? 0);
+            $iva = (float) ($item['taxes_amount'] ?? 0);
+            $total = (float) ($item['total_amount'] ?? 0);
 
-            // Obtener estado de pago local guardado
-            $localKey = $folioDoc . '_' . $taxBureauCode;
-            $estadoPago = $estadosLocales[$localKey]['estado_pago'] ?? 'pendiente';
-            $montoPagado = $estadosLocales[$localKey]['monto_pagado'] ?? 0.0;
-            $obs = $estadosLocales[$localKey]['observacion'] ?? '';
+            // Determinación por Base de Datos:
+            // 1. Si existe en tbl_facto_pagos (modificado manualmente), respetar ese estado.
+            // 2. Si existe en tbl_documentos_cobrar con impago > 0, asignar 'pendiente' o 'parcial'.
+            // 3. Si NO existe en tbl_documentos_cobrar (o impago <= 0), marcar como 'pagada' automáticamente.
+            $localKey  = $folioDoc . '_' . $taxBureauCode;
+            $rutClean  = strtolower(preg_replace('/[^0-9kK]/', '', $rutDoc));
+            $cobrarKey = $folioDoc . '_' . $rutClean;
+
+            if (isset($estadosLocales[$localKey])) {
+                $estadoPago  = $estadosLocales[$localKey]['estado_pago'];
+                $montoPagado = $estadosLocales[$localKey]['monto_pagado'];
+                $obs         = $estadosLocales[$localKey]['observacion'];
+            } elseif (isset($pendientesBD[$cobrarKey])) {
+                $estadoPago  = $pendientesBD[$cobrarKey]['estado_pago'];
+                $montoPagado = $pendientesBD[$cobrarKey]['monto_pagado'];
+                $obs         = 'Registrado en Cobranza (Impago)';
+            } else {
+                // Las que no estén en cuentas por cobrar / pendientes se dejan TODAS PAGADAS automáticamente
+                $estadoPago  = 'pagada';
+                $montoPagado = $total;
+                $obs         = 'Conciliado (Sin deuda en BD)';
+            }
 
             // Filtrar si el usuario seleccionó un estado de pago específico
             if ($estadoFiltro !== '' && $estadoPago !== $estadoFiltro) {
@@ -176,31 +215,31 @@ class FactoController extends BaseController
             $totalMontoBatch += $total;
 
             $documentos[] = [
-                'id'              => $item['document_id'] ?? null,
-                'folio'           => $folioDoc ?: '—',
-                'fecha'           => $item['issue_date'] ?? '—',
-                'codigo_sii'      => $taxBureauCode,
-                'tipo_documento'  => $tipoNombre,
-                'cliente_rut'     => $rutDoc ?: '—',
-                'cliente_nombre'  => $nombreDoc ?: '—',
-                'neto'            => $neto,
-                'iva'             => $iva,
-                'total'           => $total,
-                'estado_sii'      => ((int)($item['taxbureau_sending_status'] ?? 0) === 1) ? 'Aceptado' : 'Pendiente',
-                'estado_pago'     => $estadoPago,
-                'monto_pagado'    => $montoPagado,
-                'observacion'     => $obs
+                'id' => $item['document_id'] ?? null,
+                'folio' => $folioDoc ?: '—',
+                'fecha' => $item['issue_date'] ?? '—',
+                'codigo_sii' => $taxBureauCode,
+                'tipo_documento' => $tipoNombre,
+                'cliente_rut' => $rutDoc ?: '—',
+                'cliente_nombre' => $nombreDoc ?: '—',
+                'neto' => $neto,
+                'iva' => $iva,
+                'total' => $total,
+                'estado_sii' => ((int) ($item['taxbureau_sending_status'] ?? 0) === 1) ? 'Aceptado' : 'Pendiente',
+                'estado_pago' => $estadoPago,
+                'monto_pagado' => $montoPagado,
+                'observacion' => $obs
             ];
         }
 
         return $this->response->setJSON([
-            'success'     => true,
-            'data'        => $documentos,
+            'success' => true,
+            'data' => $documentos,
             'total_monto' => $totalMontoBatch,
-            'pagination'  => [
-                'current_page' => (int)($data['page'] ?? $requestedPage),
-                'total_pages'  => $totalPages,
-                'count'        => $totalItems
+            'pagination' => [
+                'current_page' => (int) ($data['page'] ?? $requestedPage),
+                'total_pages' => $totalPages,
+                'count' => $totalItems
             ]
         ]);
     }
@@ -211,14 +250,14 @@ class FactoController extends BaseController
      */
     public function actualizarEstadoPago(): ResponseInterface
     {
-        $raw  = $this->request->getBody();
+        $raw = $this->request->getBody();
         $json = json_decode($raw, true) ?: $this->request->getPost();
 
-        $folio       = trim((string)($json['folio'] ?? ''));
-        $codigoSii   = (int)($json['codigo_sii'] ?? 33);
-        $estadoPago  = trim((string)($json['estado_pago'] ?? 'pendiente'));
-        $montoPagado = (float)($json['monto_pagado'] ?? 0);
-        $obs         = trim((string)($json['observacion'] ?? ''));
+        $folio = trim((string) ($json['folio'] ?? ''));
+        $codigoSii = (int) ($json['codigo_sii'] ?? 33);
+        $estadoPago = trim((string) ($json['estado_pago'] ?? 'pendiente'));
+        $montoPagado = (float) ($json['monto_pagado'] ?? 0);
+        $obs = trim((string) ($json['observacion'] ?? ''));
 
         if (empty($folio) || !in_array($estadoPago, ['pendiente', 'pagada', 'parcial'], true)) {
             return $this->response->setJSON([
@@ -250,11 +289,11 @@ class FactoController extends BaseController
      */
     public function actualizarEstadoMasivo(): ResponseInterface
     {
-        $raw  = $this->request->getBody();
+        $raw = $this->request->getBody();
         $json = json_decode($raw, true) ?: $this->request->getPost();
 
-        $documentos  = $json['documentos'] ?? [];
-        $nuevoEstado = trim((string)($json['nuevo_estado'] ?? ''));
+        $documentos = $json['documentos'] ?? [];
+        $nuevoEstado = trim((string) ($json['nuevo_estado'] ?? ''));
 
         if (empty($documentos) || !in_array($nuevoEstado, ['pendiente', 'pagada', 'parcial'], true)) {
             return $this->response->setJSON([
@@ -268,9 +307,10 @@ class FactoController extends BaseController
 
         $updatedCount = 0;
         foreach ($documentos as $doc) {
-            $folio = trim((string)($doc['folio'] ?? ''));
-            $codigoSii = (int)($doc['codigo_sii'] ?? 33);
-            if (empty($folio)) continue;
+            $folio = trim((string) ($doc['folio'] ?? ''));
+            $codigoSii = (int) ($doc['codigo_sii'] ?? 33);
+            if (empty($folio))
+                continue;
 
             $sql = "INSERT INTO `tbl_facto_pagos` (`folio`, `codigo_sii`, `estado_pago`)
                     VALUES (?, ?, ?)
@@ -286,7 +326,7 @@ class FactoController extends BaseController
         return $this->response->setJSON([
             'success' => true,
             'message' => "Se actualizaron {$updatedCount} documentos a '{$nuevoEstado}' correctamente.",
-            'count'   => $updatedCount
+            'count' => $updatedCount
         ]);
     }
 
@@ -300,18 +340,18 @@ class FactoController extends BaseController
             return $cachedToken;
         }
 
-        $clientId     = env('FACTO_CLIENT_ID') ?: 'd1a179675157';
+        $clientId = env('FACTO_CLIENT_ID') ?: 'd1a179675157';
         $clientSecret = env('FACTO_CLIENT_SECRET') ?: '5de78437e4bc19ebcada104b254d5529';
-        $username     = env('FACTO_USERNAME') ?: '77775829-2/5634';
-        $password     = env('FACTO_PASSWORD') ?: '1de8af70e35aa7e0d2c7b6d4750cad25';
+        $username = env('FACTO_USERNAME') ?: '77775829-2/5634';
+        $password = env('FACTO_PASSWORD') ?: '1de8af70e35aa7e0d2c7b6d4750cad25';
 
         $authUrl = "https://api-billing.koywe.com/V1/auth";
         $authBody = [
-            "grant_type"    => "password",
-            "client_id"     => $clientId,
+            "grant_type" => "password",
+            "client_id" => $clientId,
             "client_secret" => $clientSecret,
-            "username"      => $username,
-            "password"      => $password
+            "username" => $username,
+            "password" => $password
         ];
 
         $ch = curl_init();
@@ -347,13 +387,20 @@ class FactoController extends BaseController
     private function getTipoDteNombre(int $code): string
     {
         switch ($code) {
-            case 33: return 'Factura Electrónica';
-            case 34: return 'Factura Exenta Electrónica';
-            case 39: return 'Boleta Electrónica';
-            case 52: return 'Guía de Despacho Electrónica';
-            case 61: return 'Nota de Crédito Electrónica';
-            case 56: return 'Nota de Débito Electrónica';
-            default: return 'DTE (' . $code . ')';
+            case 33:
+                return 'Factura Electrónica';
+            case 34:
+                return 'Factura Exenta Electrónica';
+            case 39:
+                return 'Boleta Electrónica';
+            case 52:
+                return 'Guía de Despacho Electrónica';
+            case 61:
+                return 'Nota de Crédito Electrónica';
+            case 56:
+                return 'Nota de Débito Electrónica';
+            default:
+                return 'DTE (' . $code . ')';
         }
     }
 }
