@@ -321,14 +321,25 @@ class FactoController extends BaseController
             ];
         }
 
+        $countResult = count($documentos);
+        if ($estadoFiltro !== '' || $numero !== '' || $cliente !== '') {
+            $totalCount  = $countResult;
+            $calcPages   = (int)ceil($totalCount / 25);
+            $totalPages  = max(1, $calcPages);
+            $currentPage = 1;
+        } else {
+            $totalCount  = $totalItems;
+            $currentPage = (int) ($data['page'] ?? $requestedPage);
+        }
+
         return $this->response->setJSON([
-            'success' => true,
-            'data' => $documentos,
+            'success'     => true,
+            'data'        => $documentos,
             'total_monto' => $totalMontoBatch,
-            'pagination' => [
-                'current_page' => (int) ($data['page'] ?? $requestedPage),
-                'total_pages' => $totalPages,
-                'count' => $totalItems
+            'pagination'  => [
+                'current_page' => $currentPage,
+                'total_pages'  => $totalPages,
+                'count'        => $totalCount
             ]
         ]);
     }
