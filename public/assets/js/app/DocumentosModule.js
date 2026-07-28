@@ -72,6 +72,14 @@ window.DocumentosModule = (function () {
     // ── Excel agrupado por CFG para no mezlcar Cobrar/Pagar ───────────────
     const _excelData = {};
 
+    // ── Filtro de búsqueda rápida por CFG ────────────────────────────────
+    const _filterQuery = { cobrar: '', pagar: '' };
+
+    function filtrar(cfg, q) {
+        _filterQuery[cfg.tipo] = (q || '').trim().toLowerCase();
+        renderTabla(cfg);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  RENDER TABLA PRINCIPAL
     // ─────────────────────────────────────────────────────────────────────
@@ -79,17 +87,24 @@ window.DocumentosModule = (function () {
         const tbody = document.getElementById(cfg.tbody);
         if (!tbody) return;
         tbody.innerHTML = '';
-        const db = cfg.db();
-        let total = 0;
+        const dbFull = cfg.db();
+        const totalFull = dbFull.reduce((s, r) => s + (r.monto || 0), 0);
 
-        if (!db.length) {
+        const query = _filterQuery[cfg.tipo] || '';
+        const dbToDisplay = query ? dbFull.filter(r => {
+            const nameMatch = (r.nombre || r.cliente || r.proveedor || '').toLowerCase().includes(query);
+            const rutMatch  = (r.rut || '').toLowerCase().includes(query);
+            const docMatch  = (r.docs || []).some(d => String(d.nro || d.numero || '').toLowerCase().includes(query));
+            return nameMatch || rutMatch || docMatch;
+        }) : dbFull;
+
+        if (!dbToDisplay.length) {
             tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:24px;color:#94a3b8;font-size:.80rem;">
                 <i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;"></i>
-                No hay cuentas por ${cfg.tipo} con saldo pendiente.
+                ${query ? 'Sin resultados coincidentes con la búsqueda.' : `No hay cuentas por ${cfg.tipo} con saldo pendiente.`}
             </td></tr>`;
         } else {
-            db.forEach((r, i) => {
-                total += r.monto || 0;
+            dbToDisplay.forEach((r, i) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                 <td style="color:#b0bec5;font-size:.72rem;">${i + 1}</td>
@@ -109,11 +124,11 @@ window.DocumentosModule = (function () {
             });
         }
 
-        const t = PortalApp.fmt(total);
+        const t = PortalApp.fmt(totalFull);
         if (document.getElementById(cfg.totalEl)) document.getElementById(cfg.totalEl).textContent = t;
         if (document.getElementById(cfg.kpiVal)) document.getElementById(cfg.kpiVal).textContent = t;
         if (document.getElementById(cfg.kpiSub)) document.getElementById(cfg.kpiSub).textContent =
-            `${db.length} ${db.length !== 1 ? cfg.labelPlural : cfg.label.toLowerCase()}`;
+            `${dbFull.length} ${dbFull.length !== 1 ? cfg.labelPlural : cfg.label.toLowerCase()}`;
         if (typeof cfg.onRecalc === 'function') cfg.onRecalc();
     }
 
@@ -983,7 +998,7 @@ window.DocumentosModule = (function () {
 
     // API pública
     return {
-        renderTabla, abrirModalAgregar, guardarRegistro,
+        renderTabla, filtrar, abrirModalAgregar, guardarRegistro,
         verDetalle, _renderDetalleBody,
         eliminarDocDetalle, agregarDocDetalle,
         eliminar, confirmarEliminar,

@@ -371,6 +371,7 @@ const abrirModalExcel = () => DocumentosModule.abrirModalExcel(CFG_COBRAR);
 const importarExcel = () => DocumentosModule.importarExcel(CFG_COBRAR);
 const guardarRegistro = () => DocumentosModule.guardarRegistro(CFG_COBRAR);
 function confirmarEliminarCobrar() { DocumentosModule.confirmarEliminar(CFG_COBRAR); }
+function filtrarCobrar(q) { DocumentosModule.filtrar(CFG_COBRAR, q); }
 
 // ── Pagar ──
 const guardarEnBDPagar = () => DocumentosModule.guardarEnBD(CFG_PAGAR);
@@ -378,6 +379,7 @@ const abrirModalExcelPagar = () => DocumentosModule.abrirModalExcel(CFG_PAGAR);
 const importarExcelPagar = () => DocumentosModule.importarExcel(CFG_PAGAR);
 const guardarRegistroPagar = () => DocumentosModule.guardarRegistro(CFG_PAGAR);
 function confirmarEliminarPagar() { DocumentosModule.confirmarEliminar(CFG_PAGAR); }
+function filtrarPagar(q) { DocumentosModule.filtrar(CFG_PAGAR, q); }
 
 // ── Abrir modales desde botones del panel ──
 function abrirModalAgregarCobrar() { DocumentosModule.abrirModalAgregar(CFG_COBRAR); }

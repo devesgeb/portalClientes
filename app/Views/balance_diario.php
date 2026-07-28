@@ -183,6 +183,14 @@
                             </div>
                         </div>
 
+                        <!-- Input búsqueda rápida -->
+                        <div style="padding:8px 12px;border-bottom:1px solid #f0f4f9;">
+                            <input type="text" id="cobrarBusqueda" class="form-control form-control-sm"
+                                placeholder="🔍 Filtrar cliente, RUT o folio..."
+                                oninput="filtrarCobrar(this.value)"
+                                style="font-size:.76rem;border-color:#e2e8f0;border-radius:8px;">
+                        </div>
+
                         <!-- Table -->
                         <div class="panel-body">
                             <table class="tbl table table-borderless" id="tblCobrar">
@@ -292,6 +300,14 @@
                                     <i class="bi bi-arrows-angle-expand"></i>
                                 </button>
                             </div>
+                        </div>
+
+                        <!-- Input búsqueda rápida -->
+                        <div style="padding:8px 12px;border-bottom:1px solid #f0f4f9;">
+                            <input type="text" id="pagarBusqueda" class="form-control form-control-sm"
+                                placeholder="🔍 Filtrar proveedor, RUT o folio..."
+                                oninput="filtrarPagar(this.value)"
+                                style="font-size:.76rem;border-color:#e2e8f0;border-radius:8px;">
                         </div>
                     </div><!-- /panel-head Pagar -->
 
