@@ -194,50 +194,47 @@ async function cargarInventario() {
 function renderCaja() {
     const tbody = document.getElementById('bodyCaja');
     tbody.innerHTML = '';
-    let total = 0;
+    
+    // Calcular el total completo del inventario basado en dbCajaFull (sin filtrar)
+    const totalInventarioFull = dbCajaFull.reduce((s, r) => s + (r.precio * Math.max(0, r.stock - r.stock_reservado)), 0);
 
     if (!dbCaja.length) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;font-size:.80rem;">
             <i class="bi bi-inbox" style="display:block;font-size:1.5rem;margin-bottom:6px;opacity:.25;"></i>
-            Sin productos en inventario.
+            Sin productos coincidentes en el filtro.
         </td></tr>`;
-        document.getElementById('totalCaja').textContent = PortalApp.fmt(0);
-        document.getElementById('kpiCaja').textContent = PortalApp.fmt(0);
-        document.getElementById('kpiCajaSub').textContent = '0 ítems';
-        recalcNeto();
-        return;
+    } else {
+        dbCaja.forEach(r => {
+            const disponible = Math.max(0, r.stock - r.stock_reservado);
+            const monto = r.precio * disponible;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-size:.80rem;font-weight:600;color:#1a2940;">${r.nombre}</td>
+                <td class="text-end" style="font-size:.80rem;color:#0891b2;font-weight:600;">${PortalApp.fmt(r.precio)}</td>
+                <td class="text-end" style="font-size:.80rem;font-weight:600;">${disponible}</td>
+                <td class="text-end" style="font-size:.80rem;font-weight:600;color:#4f46e5;">${r.stock_reservado}</td>
+                <td class="text-end amt-caja" style="font-size:.80rem;font-weight:700;">${PortalApp.fmt(monto)}</td>
+                <td class="text-center">
+                    <div class="d-flex gap-1 justify-content-center">
+                        <button class="btn-act" title="Visualizar" onclick="verProductoCaja('${r.sku}')">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn-act add" title="Editar stock" onclick="editarProductoCaja('${r.sku}')">
+                            <i class="bi bi-pencil-fill"></i>
+                        </button>
+                        <button class="btn-act del" title="Quitar de lista" onclick="eliminarCaja('${r.sku}')">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                </td>`;
+            tbody.appendChild(tr);
+        });
     }
 
-    dbCaja.forEach(r => {
-        const disponible = Math.max(0, r.stock - r.stock_reservado);
-        const monto = r.precio * disponible;
-        total += monto;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td style="font-size:.80rem;font-weight:600;color:#1a2940;">${r.nombre}</td>
-            <td class="text-end" style="font-size:.80rem;color:#0891b2;font-weight:600;">${PortalApp.fmt(r.precio)}</td>
-            <td class="text-end" style="font-size:.80rem;font-weight:600;">${disponible}</td>
-            <td class="text-end" style="font-size:.80rem;font-weight:600;color:#4f46e5;">${r.stock_reservado}</td>
-            <td class="text-end amt-caja" style="font-size:.80rem;font-weight:700;">${PortalApp.fmt(monto)}</td>
-            <td class="text-center">
-                <div class="d-flex gap-1 justify-content-center">
-                    <button class="btn-act" title="Visualizar" onclick="verProductoCaja('${r.sku}')">
-                        <i class="bi bi-eye"></i>
-                    </button>
-                    <button class="btn-act add" title="Editar stock" onclick="editarProductoCaja('${r.sku}')">
-                        <i class="bi bi-pencil-fill"></i>
-                    </button>
-                    <button class="btn-act del" title="Quitar de lista" onclick="eliminarCaja('${r.sku}')">
-                        <i class="bi bi-trash3"></i>
-                    </button>
-                </div>
-            </td>`;
-        tbody.appendChild(tr);
-    });
-
-    document.getElementById('totalCaja').textContent = PortalApp.fmt(total);
-    document.getElementById('kpiCaja').textContent    = PortalApp.fmt(total);
-    document.getElementById('kpiCajaSub').textContent = `${dbCaja.length} ítem${dbCaja.length !== 1 ? 's' : ''}`;
+    // Mantener los Totales y KPIs con la totalidad real del inventario (dbCajaFull)
+    document.getElementById('totalCaja').textContent = PortalApp.fmt(totalInventarioFull);
+    document.getElementById('kpiCaja').textContent    = PortalApp.fmt(totalInventarioFull);
+    document.getElementById('kpiCajaSub').textContent = `${dbCajaFull.length} ítem${dbCajaFull.length !== 1 ? 's' : ''}`;
     recalcNeto();
 }
 
@@ -357,7 +354,7 @@ async function guardarEdicionProducto() {
 // ════════════════════════════════════════════════════════════════════════
 function recalcNeto() {
     const cobrar = dbCobrar.reduce((s, r) => s + (r.monto || 0), 0);
-    const caja   = dbCaja.reduce((s, r) => s + (r.precio * Math.max(0, r.stock - r.stock_reservado)), 0);
+    const caja   = dbCajaFull.reduce((s, r) => s + (r.precio * Math.max(0, r.stock - r.stock_reservado)), 0);
     const pagar  = dbPagar.reduce((s, r) => s + (r.monto || 0), 0);
     const neto   = cobrar + caja - pagar;
     const el = document.getElementById('kpiNeto');
