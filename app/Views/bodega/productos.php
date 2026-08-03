@@ -245,8 +245,10 @@
                         <tr>
                             <th>Nombre</th>
                             <th>SKU</th>
-                            <th style="text-align:center;">Cant. disponible</th>
+                            <th style="text-align:center;">Stock bodega</th>
                             <th style="text-align:center;">Stock reservado</th>
+                            <th style="text-align:right;">Costo neto</th>
+                            <th style="text-align:right;color:#dc2626;">Costo c/Impto</th>
                             <th style="text-align:right;">Precio neto</th>
                             <th style="text-align:right;">Precio c/Impto</th>
                             <th>Acciones</th>
@@ -254,7 +256,7 @@
                     </thead>
                     <tbody id="tbodyProductos">
                         <tr class="empty-row">
-                            <td colspan="7">
+                            <td colspan="9">
                                 <i class="bi bi-arrow-repeat me-2"></i>Cargando productos…
                             </td>
                         </tr>
@@ -593,7 +595,7 @@ async function cargarProductos() {
         }
     } catch(e) {
         document.getElementById('tbodyProductos').innerHTML =
-            `<tr class="empty-row"><td colspan="7"><i class="bi bi-x-circle me-2" style="color:#dc2626;"></i>Error al cargar productos.</td></tr>`;
+            `<tr class="empty-row"><td colspan="9"><i class="bi bi-x-circle me-2" style="color:#dc2626;"></i>Error al cargar productos.</td></tr>`;
     }
 }
 
@@ -633,7 +635,7 @@ function renderTabla() {
     const tbody = document.getElementById('tbodyProductos');
 
     if (!page.length) {
-        tbody.innerHTML = `<tr class="empty-row"><td colspan="7"><i class="bi bi-inbox me-2"></i>Sin productos para mostrar.</td></tr>`;
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="9"><i class="bi bi-inbox me-2"></i>Sin productos para mostrar.</td></tr>`;
         actualizarPaginacion();
         return;
     }
@@ -641,7 +643,9 @@ function renderTabla() {
     tbody.innerHTML = page.map(p => {
         const stock        = parseFloat(p.stock_bodega_ppral) || 0;
         const reservado    = parseFloat(p.stock_reservado) || 0;
-        const disponible   = Math.max(0, stock - reservado);
+        const costoNetoVal = p.costo_neto != null ? parseFloat(p.costo_neto) : null;
+        const costoNeto    = costoNetoVal != null ? fmt(costoNetoVal) : '--';
+        const costoCImpto  = costoNetoVal != null ? fmt(Math.round(costoNetoVal * 1.19)) : '--';
         const listaFiltro  = document.getElementById('filtroLista').value;
 
         // Determinar qué lista usar para mostrar el precio
@@ -662,13 +666,15 @@ function renderTabla() {
             <td class="nombre-cell" title="${p.nombre || ''}">${p.nombre || '--'}</td>
             <td><span class="sku-badge">${p.sku}</span></td>
             <td style="text-align:center;">
-                <span class="stock-cell ${stockClass(disponible)}">${fmtN(disponible)}</span>
+                <span class="stock-cell ${stockClass(stock)}">${fmtN(stock)}</span>
                 <span style="font-size:.70rem;color:#94a3b8;margin-left:2px;">${p.unidad || ''}</span>
             </td>
             <td style="text-align:center;">
-                <span class="stock-cell" style="color:#4f46e5;font-weight:700;">${fmtN(parseFloat(p.stock_reservado) || 0)}</span>
+                <span class="stock-cell" style="color:#4f46e5;font-weight:700;">${fmtN(reservado)}</span>
                 <span style="font-size:.70rem;color:#94a3b8;margin-left:2px;">${p.unidad || ''}</span>
             </td>
+            <td class="precio-cell" style="text-align:right;color:#64748b;font-weight:600;">${costoNeto}</td>
+            <td class="precio-cell" style="text-align:right;color:#dc2626;font-weight:700;">${costoCImpto}</td>
             <td class="precio-cell" style="text-align:right;">${precioNeto}</td>
             <td class="precio-imp"  style="text-align:right;">${precioTotal}</td>
             <td>

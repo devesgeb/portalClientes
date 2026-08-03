@@ -66,8 +66,7 @@ class BalanceDiario extends BaseController
                 'tipo_documento' => trim(substr($reg['tipo_documento'] ?? 'Sin tipo', 0, 120)),
                 'fecha' => $fecha,
                 'numero' => trim(substr((string) ($reg['numero'] ?? ''), 0, 50)),
-                'emisor_receptor' => trim(substr($reg['emisor_receptor'], 0, 200)),
-                'rut' => trim(substr($reg['rut'] ?? '', 0, 20)),
+                'rut_cliente' => trim(substr($reg['rut_cliente'] ?? $reg['rut'] ?? '', 0, 20)),
                 'total' => (float) ($reg['total'] ?? 0),
                 'pagado' => (float) ($reg['pagado'] ?? 0),
                 'impago' => (float) ($reg['impago'] ?? 0),
@@ -119,7 +118,11 @@ class BalanceDiario extends BaseController
         // Normalizar fechas de los docs
         $clientesNormalizados = [];
         foreach ($body['clientes'] as $idx => $cliente) {
-            $rut = trim($cliente['rut_cliente'] ?? $cliente['rut'] ?? '');
+            $rut = trim((string)($cliente['rut_cliente'] ?? $cliente['rut'] ?? ''));
+            $nombre = trim((string)($cliente['emisor_receptor'] ?? $cliente['nombre_cliente'] ?? $cliente['nombre'] ?? ''));
+            if (empty($rut) && !empty($nombre)) {
+                $rut = 'SIN-RUT-' . strtoupper(substr(md5($nombre), 0, 8));
+            }
             if (empty($rut))
                 continue;
 
@@ -130,7 +133,7 @@ class BalanceDiario extends BaseController
                     'tipo_documento' => $doc['tipo_documento'] ?? 'Sin tipo',
                     'fecha' => $fecha ?: date('Y-m-d'),
                     'numero' => (string) ($doc['numero'] ?? ''),
-                    'rut' => $doc['rut'] ?? ($cliente['rut'] ?? ''),
+                    'rut' => $doc['rut'] ?? $rut,
                     'total' => (float) ($doc['total'] ?? 0),
                     'pagado' => (float) ($doc['pagado'] ?? 0),
                     'impago' => (float) ($doc['impago'] ?? 0),
@@ -139,7 +142,7 @@ class BalanceDiario extends BaseController
 
             $clientesNormalizados[] = [
                 'rut_cliente' => $rut,
-                'nombre_cliente' => trim($cliente['emisor_receptor'] ?? $cliente['nombre_cliente'] ?? ''),
+                'nombre_cliente' => $nombre ?: $rut,
                 'docs' => $docsNormalizados,
             ];
         }
@@ -187,6 +190,17 @@ class BalanceDiario extends BaseController
         }
 
         try {
+            $db = \Config\Database::connect();
+            $docsCobrar = $db->table('tbl_documentos_cobrar')->select('numero')->where('rut_cliente', $rut)->get()->getResultArray();
+            foreach ($docsCobrar as $dc) {
+                $fol = trim((string)$dc['numero']);
+                if (!empty($fol) && $fol !== 'N/A') {
+                    $sqlFacto = "INSERT INTO `tbl_facto_pagos` (`folio`, `codigo_sii`, `estado_pago`, `monto_pagado`, `observacion`)
+                                 VALUES (?, 33, 'pagada', 0.00, 'Pagada / Conciliada')
+                                 ON DUPLICATE KEY UPDATE `estado_pago` = 'pagada', `observacion` = 'Pagada / Conciliada', `updated_at` = CURRENT_TIMESTAMP";
+                    $db->query($sqlFacto, [$fol]);
+                }
+            }
             $eliminados = $this->cobrarModel->eliminarPorCliente($rut);
         } catch (\Exception $e) {
             log_message('error', '[BalanceDiario::eliminarCobrar] ' . $e->getMessage());
@@ -400,7 +414,7 @@ class BalanceDiario extends BaseController
                 p.stock_reservado,
                 ROUND(p.costo_neto * 1.19 * p.stock_bodega_ppral, 0) AS total
             FROM tbl_productos p
-            WHERE p.activo = 1
+            WHERE p.activo = 1 AND p.stock_bodega_ppral > 0
             ORDER BY p.nombre ASC
         ")->getResultArray();
 

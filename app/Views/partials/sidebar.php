@@ -7,8 +7,9 @@
  */
 $activePage = $activePage ?? 'admin';
 $contabOpen = ['balance-diario', 'gastos', 'pagos-mensuales', 'historial-balances'];
-$cobranzaOpen = ['documentos-impago', 'facturas-facto'];
+$cobranzaOpen = ['documentos-impago', 'manejo-caja'];
 $cpOpen = ['cargar-entidad', 'buscar-entidad'];
+$facturacionOpen = ['emitir-factura', 'buscar-documentos-facto', 'facturas-facto', 'importar-documentos-ventas', 'importar-documentos-proveedores'];
 $bodegaOpen    = ['productos', 'carga-masiva-productos'];
 $logisticaOpen = ['hoja-de-ruta', 'despachos-agendados', 'funcionarios'];
 $devOpen       = ['solicitar-devolucion', 'historial-devoluciones'];
@@ -53,6 +54,31 @@ function sbOpenClass(array $g, string $active): string
             </a>
         </div>
 
+        <div class="nav-sec">Facturación</div>
+        <button class="s-parent<?= sbOpen($facturacionOpen, $activePage) ?>" onclick="toggleMenu('menuFacturacion')" id="parentFacturacion">
+            <i class="bi bi-receipt-cutoff"></i><span>Facturación</span>
+            <i class="bi bi-chevron-right chevron"></i>
+        </button>
+        <div class="sub-nav" id="menuFacturacion" class="sub-nav<?= sbOpenClass($facturacionOpen, $activePage) ?>">
+            <a href="<?= site_url('facturacion/emitir') ?>" class="sub-link<?= sbActive('emitir-factura', $activePage) ?>">
+                <i class="bi bi-plus-circle"></i> Emitir
+            </a>
+            <a href="<?= site_url('cobranza/facturas-facto') ?>" class="sub-link<?= sbActive('buscar-documentos-facto', $activePage) ?>">
+                <i class="bi bi-search"></i> Buscar documentos
+            </a>
+
+            <!-- Subgrupo Importar -->
+            <div class="sub-group-header px-3 py-1.5 mt-2 fw-bold text-uppercase d-flex align-items-center gap-1" style="font-size: 0.76rem; letter-spacing: 0.8px; color: #38bdf8; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+                <i class="bi bi-cloud-arrow-up-fill me-1" style="font-size: 0.85rem;"></i> Importar
+            </div>
+            <a href="<?= site_url('cobranza/facturas-facto') ?>" class="sub-link ps-4<?= (sbActive('facturas-facto', $activePage) || sbActive('importar-documentos-ventas', $activePage)) ?>">
+                <i class="bi bi-file-earmark-spreadsheet text-emerald-500 me-1"></i> Documentos Ventas
+            </a>
+            <a href="<?= site_url('facturacion/importar/proveedores') ?>" class="sub-link ps-4<?= sbActive('importar-documentos-proveedores', $activePage) ?>">
+                <i class="bi bi-file-earmark-text text-amber-500 me-1"></i> Documentos Proveedores
+            </a>
+        </div>
+
         <div class="nav-sec">Contabilidad</div>
         <button class="s-parent<?= sbOpen($contabOpen, $activePage) ?>" onclick="toggleMenu('menuContab')"
             id="parentContab">
@@ -75,11 +101,14 @@ function sbOpenClass(array $g, string $active): string
             <i class="bi bi-chevron-right chevron"></i>
         </button>
         <div class="sub-nav" id="menuCobranza" class="sub-nav<?= sbOpenClass($cobranzaOpen, $activePage) ?>">
+            <a href="<?= site_url('balance-diario') ?>" class="sub-link<?= sbActive('balance-diario', $activePage) ?>">
+                <i class="bi bi-cash-stack"></i> Cuentas por Cobrar
+            </a>
+            <a href="<?= site_url('cobranza/manejo-caja') ?>" class="sub-link<?= sbActive('manejo-caja', $activePage) ?>">
+                <i class="bi bi-safe-fill"></i> Manejo de caja
+            </a>
             <a href="<?= site_url('cobranza/documentos-impago') ?>" class="sub-link<?= sbActive('documentos-impago', $activePage) ?>">
                 <i class="bi bi-file-earmark-exclamation-fill"></i> Documentos impago
-            </a>
-            <a href="<?= site_url('cobranza/facturas-facto') ?>" class="sub-link<?= sbActive('facturas-facto', $activePage) ?>">
-                <i class="bi bi-receipt"></i> Facturas Facto
             </a>
         </div>
 
@@ -128,8 +157,8 @@ function sbOpenClass(array $g, string $active): string
             <a href="<?= site_url('usuarios') ?>" class="sub-link<?= sbActive('usuarios', $activePage) ?>">
                 <i class="bi bi-person-fill-gear"></i> Usuarios
             </a>
-            <a href="#" class="sub-link<?= sbActive('cuentas-bancarias', $activePage) ?>">
-                <i class="bi bi-bank2"></i> Cuentas bancarias
+            <a href="<?= site_url('administracion/cuentas-bancarias') ?>" class="sub-link<?= sbActive('cuentas-bancarias', $activePage) ?>">
+                <i class="bi bi-bank2"></i> Cuenta bancaria / Efectivo
             </a>
             <a href="#" class="sub-link<?= sbActive('datos-empresa', $activePage) ?>">
                 <i class="bi bi-building"></i> Datos de la empresa
@@ -184,6 +213,7 @@ function sbOpenClass(array $g, string $active): string
     (function () {
         var groups = {
             menuCP: <?= json_encode($cpOpen) ?>,
+            menuFacturacion: <?= json_encode($facturacionOpen) ?>,
             menuContab: <?= json_encode($contabOpen) ?>,
             menuCobranza: <?= json_encode($cobranzaOpen) ?>,
             menuBodega: <?= json_encode($bodegaOpen) ?>,

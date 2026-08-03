@@ -4,52 +4,44 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= esc($title) ?> – Portal de Clientes</title>
-    <meta name="description" content="Visualización y gestión de documentos emitidos desde Facto API.">
+    <meta name="description" content="Visualización y gestión de documentos recibidos de proveedores desde Facto API.">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= base_url('public/assets/css/admin.css') ?>">
-    
     <style>
         .card-stats {
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
             border: 1px solid #e2e8f0;
-            border-radius: 14px;
+            border-radius: 12px;
+            background: #ffffff;
+            transition: transform 0.2s, box-shadow 0.2s;
         }
         .card-stats:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
         }
         .table-container {
+            background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 14px;
             overflow: hidden;
-            background: #ffffff;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
         }
-        .table thead {
-            background-color: #f8fafc;
-            border-bottom: 2px solid #edf2f7;
-        }
         .table th {
-            font-weight: 600;
+            background-color: #f8fafc;
             color: #475569;
-            font-size: 0.8rem;
+            font-weight: 600;
+            font-size: 0.78rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 14px 16px;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e2e8f0;
+            padding: 12px 16px;
         }
         .table td {
-            padding: 14px 16px;
-            vertical-align: middle;
             font-size: 0.85rem;
-            color: #1e293b;
-        }
-        .badge-dte {
-            padding: 5px 10px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.72rem;
+            padding: 14px 16px;
+            color: #334155;
+            border-bottom: 1px solid #f1f5f9;
         }
         .search-card {
             border: 1px solid #e2e8f0;
@@ -88,8 +80,8 @@
             padding: 12px 18px;
             margin-bottom: 16px;
         }
-        .btn-emerald-action {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        .btn-amber-action {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
             color: #ffffff !important;
             border: none;
             border-radius: 10px;
@@ -97,12 +89,12 @@
             font-size: 0.88rem;
             padding: 9px 20px;
             transition: all 0.2s ease-in-out;
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25);
         }
-        .btn-emerald-action:hover {
-            background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+        .btn-amber-action:hover {
+            background: linear-gradient(135deg, #b45309 0%, #92400e 100%);
             transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
+            box-shadow: 0 6px 16px rgba(217, 119, 6, 0.35);
         }
         .btn-search-main {
             background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
@@ -150,9 +142,9 @@
             </button>
             <div>
                 <div class="topbar-title" id="topbarTitle">
-                    <i class="bi bi-receipt me-2" style="color:var(--accent);"></i>Facturas Facto
+                    <i class="bi bi-file-earmark-text me-2" style="color:var(--accent);"></i>Documentos Proveedores (Compras)
                 </div>
-                <div class="topbar-sub" id="topbarSub">Cobranza &rsaquo; Documentos Emitidos Facto API</div>
+                <div class="topbar-sub" id="topbarSub">Facturación &rsaquo; Documentos Recibidos Facto API</div>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -165,24 +157,23 @@
                     <div class="ub-name" id="topbarNombre">Cargando...</div>
                     <div class="ub-role" id="topbarRol">Administrador</div>
                 </div>
-                <i class="bi bi-info-circle ms-1" style="color:var(--text-sub);font-size:.80rem;"></i>
             </div>
         </div>
     </div>
 
-    <div class="page-body">
+    <div class="page-content p-4">
         
-        <!-- Tarjetas de Resumen Rápido -->
+        <!-- Tarjetas Estadísticas -->
         <div class="row g-3 mb-4">
             <div class="col-md-4">
                 <div class="card card-stats h-100 shadow-sm">
                     <div class="card-body d-flex align-items-center gap-3">
-                        <div class="p-3 bg-primary-subtle text-primary rounded-4" style="font-size: 1.5rem;">
+                        <div class="p-3 bg-warning-subtle text-warning rounded-4" style="font-size: 1.5rem;">
                             <i class="bi bi-file-earmark-text-fill"></i>
                         </div>
                         <div>
-                            <div class="text-muted fs-7 fw-medium text-uppercase">Total Documentos Emitidos</div>
-                            <h4 class="fw-bold mb-0 text-slate-800" id="statTotalCount">0</h4>
+                            <div class="text-muted fs-7 fw-medium text-uppercase">Total Documentos Proveedores</div>
+                            <h4 class="fw-bold mb-0 text-slate-800" id="statTotalDocs">0</h4>
                         </div>
                     </div>
                 </div>
@@ -190,11 +181,11 @@
             <div class="col-md-4">
                 <div class="card card-stats h-100 shadow-sm">
                     <div class="card-body d-flex align-items-center gap-3">
-                        <div class="p-3 bg-success-subtle text-success rounded-4" style="font-size: 1.5rem;">
+                        <div class="p-3 bg-amber-subtle text-amber rounded-4" style="font-size: 1.5rem; background-color:#fef3c7; color:#d97706;">
                             <i class="bi bi-currency-dollar"></i>
                         </div>
                         <div>
-                            <div class="text-muted fs-7 fw-medium text-uppercase">Monto Total Página/Filtro</div>
+                            <div class="text-muted fs-7 fw-medium text-uppercase">Monto Total Compras / Proveedores</div>
                             <h4 class="fw-bold mb-0 text-slate-800" id="statTotalMonto">$0</h4>
                         </div>
                     </div>
@@ -208,8 +199,8 @@
                         </div>
                         <div>
                             <div class="text-muted fs-7 fw-medium text-uppercase">Conexión Facto API</div>
-                            <h4 class="fw-bold mb-0 text-slate-800" style="font-size: 1.1rem;">Koywe Billing API</h4>
-                            <span class="badge bg-success-subtle text-success font-monospace" style="font-size:0.7rem;">RUT: 77.775.829-2</span>
+                            <h4 class="fw-bold mb-0 text-slate-800" style="font-size: 1.1rem;">Koywe Billing (Recibidos)</h4>
+                            <span class="badge bg-success-subtle text-success font-monospace" style="font-size:0.7rem;">Proveedores DTE</span>
                         </div>
                     </div>
                 </div>
@@ -220,25 +211,25 @@
         <div class="search-card">
             <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
                 <h6 class="fw-bold text-slate-800 mb-0 d-flex align-items-center gap-2">
-                    <i class="bi bi-funnel-fill text-primary" style="font-size:1.1rem;"></i>Filtros de Búsqueda Facto
+                    <i class="bi bi-funnel-fill text-amber-600" style="font-size:1.1rem; color:#d97706;"></i>Filtros de Búsqueda Proveedores
                 </h6>
-                <span class="text-muted" style="font-size:0.78rem;">Filtra y organiza los documentos emitidos desde Koywe Facto API</span>
+                <span class="text-muted" style="font-size:0.78rem;">Filtra y revisa los DTEs recibidos de proveedores desde Koywe Facto API</span>
             </div>
             
             <form id="formFiltros" onsubmit="event.preventDefault(); buscarDocumentos();">
                 <div class="row g-3">
                     <div class="col-md-3">
-                        <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Cliente (Nombre o RUT)</label>
+                        <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Proveedor (Nombre o RUT)</label>
                         <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-light text-muted"><i class="bi bi-building"></i></span>
-                            <input type="text" class="form-control form-control-sm" id="filterCliente" placeholder="Ej: Talbot o 96.685...">
+                            <span class="input-group-text bg-light text-muted"><i class="bi bi-truck"></i></span>
+                            <input type="text" class="form-control form-control-sm" id="filterCliente" placeholder="Ej: Frutti Fruit o 76.885...">
                         </div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Folio (Número)</label>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-light text-muted"><i class="bi bi-hash"></i></span>
-                            <input type="text" class="form-control form-control-sm" id="filterNumero" placeholder="Ej: 1532">
+                            <input type="text" class="form-control form-control-sm" id="filterNumero" placeholder="Ej: 1425">
                         </div>
                     </div>
                     <div class="col-md-2">
@@ -246,8 +237,8 @@
                         <select class="form-select form-select-sm fw-medium" id="filterTipoDte">
                             <option value="">Todos los DTEs</option>
                             <option value="33">Facturas Electrónicas (33)</option>
+                            <option value="34">Facturas Exentas (34)</option>
                             <option value="52">Guías de Despacho (52)</option>
-                            <option value="39">Boletas Electrónicas (39)</option>
                             <option value="61">Notas de Crédito (61)</option>
                         </select>
                     </div>
@@ -270,12 +261,12 @@
                     </div>
                 </div>
 
-                <!-- Botonera de Acciones Destacadas (Botonera Clara y Altamente Visible) -->
+                <!-- Botonera de Acciones Destacadas -->
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4 pt-3 border-top bg-light-subtle rounded-3 p-2">
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" class="btn btn-search-main d-flex align-items-center gap-2" onclick="buscarDocumentos()">
                             <i class="bi bi-search"></i>
-                            <span>Buscar Documentos</span>
+                            <span>Buscar Proveedores</span>
                         </button>
                         <button type="button" class="btn btn-clear-main d-flex align-items-center gap-2" onclick="limpiarFiltros()">
                             <i class="bi bi-arrow-counterclockwise"></i>
@@ -283,19 +274,19 @@
                         </button>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-emerald-action d-flex align-items-center gap-2 shadow" onclick="abrirModalImportarCobrar()" title="Inspeccionar e Importar DTEs a Cuentas por Cobrar">
+                        <button type="button" class="btn btn-amber-action d-flex align-items-center gap-2 shadow" onclick="abrirModalImportarPagar()" title="Inspeccionar e Importar DTEs a Cuentas por Pagar">
                             <i class="bi bi-cloud-download-fill fs-6"></i>
-                            <span>Cargar a Cuentas por Cobrar</span>
+                            <span>Cargar a Cuentas por Pagar</span>
                         </button>
                     </div>
                 </div>
             </form>
         </div>
 
-        <!-- Barra de Acciones Masivas (Combo Box en la parte superior) -->
+        <!-- Barra de Acciones Masivas -->
         <div id="bulkActionsBar" class="bulk-bar d-flex align-items-center justify-content-between shadow-sm" style="display: none !important;">
             <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-check-square-fill text-primary" style="font-size: 1.2rem;"></i>
+                <i class="bi bi-check-square-fill text-amber-600" style="font-size: 1.2rem; color:#d97706;"></i>
                 <span class="fw-bold text-slate-700" style="font-size: 0.88rem;" id="selectedCountText">0 documentos seleccionados</span>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -305,7 +296,7 @@
                     <option value="pendiente">🔴 Pendiente</option>
                     <option value="parcial">🟡 Pago Parcial</option>
                 </select>
-                <button type="button" class="btn btn-sm btn-success px-3 fw-semibold py-1.5" onclick="aplicarAccionMasiva()">
+                <button type="button" class="btn btn-sm btn-warning px-3 fw-semibold py-1.5" onclick="aplicarAccionMasiva()">
                     <i class="bi bi-check2-all me-1"></i> Aplicar Cambios
                 </button>
             </div>
@@ -315,46 +306,46 @@
         <div class="table-container">
             <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light-subtle">
                 <span class="fw-bold text-slate-700" style="font-size:0.9rem;">
-                    <i class="bi bi-table me-2 text-primary"></i>Listado de DTEs Emitidos en Facto
+                    <i class="bi bi-table me-2 text-warning"></i>Listado de DTEs Recibidos de Proveedores
                 </span>
-                <span class="badge bg-primary rounded-pill" id="countBadge">0 documentos</span>
+                <span class="badge bg-warning text-dark fw-bold rounded-pill" id="countBadge">0 documentos</span>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
                             <th class="text-center" style="width:40px;">
-                                <input type="checkbox" class="form-check-input" id="checkSelectAll" onclick="toggleSelectAll(this)" title="Seleccionar todos en la página">
+                                <input type="checkbox" class="form-check-input" id="checkSelectAll" onclick="toggleSelectAll(this)">
                             </th>
                             <th>Folio</th>
                             <th>Fecha</th>
-                            <th>Tipo Doc</th>
-                            <th>Cliente</th>
-                            <th class="text-end">Neto</th>
-                            <th class="text-end">IVA</th>
-                            <th class="text-end">Total</th>
+                            <th>Tipo Documento</th>
+                            <th>RUT Proveedor</th>
+                            <th>Razón Social Proveedor</th>
+                            <th class="text-end">Total ($)</th>
                             <th class="text-center">Estado SII</th>
-                            <th class="text-center" style="width: 140px;">Estado de Pago</th>
+                            <th class="text-center">Estado Pago</th>
+                            <th>Observación / Estado</th>
                         </tr>
                     </thead>
-                    <tbody id="resultadosBody">
+                    <tbody id="tableBodyDocs">
                         <tr>
                             <td colspan="10" class="text-center py-5 text-muted">
-                                <span class="spinner-border spinner-border-sm me-2 text-primary"></span>
-                                Cargando documentos emitidos desde Facto API...
+                                <span class="spinner-border spinner-border-sm me-2 text-warning"></span>
+                                Cargando documentos recibidos de proveedores...
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-            <!-- Paginador -->
-            <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light-subtle" id="paginationContainer" style="display: none !important;">
-                <div class="text-muted" id="paginationInfo" style="font-size: 0.78rem;">
+
+            <!-- Paginación -->
+            <div class="p-3 bg-light border-top d-flex justify-content-between align-items-center" id="paginationContainer">
+                <div class="text-slate-600" style="font-size:0.82rem;">
                     Mostrando página <span class="fw-semibold text-dark" id="currentPageNum">1</span> de <span class="fw-semibold text-dark" id="totalPagesNum">1</span> (<span class="fw-semibold text-dark" id="totalDocsNum">0</span> documentos)
                 </div>
                 <nav aria-label="Navegación de páginas">
                     <ul class="pagination pagination-sm mb-0" id="paginationList">
-                        <!-- Botones de página inyectados aquí -->
                     </ul>
                 </nav>
             </div>
@@ -363,27 +354,27 @@
     </div>
 </div>
 
-<!-- Modal Cargar DTEs a Cuentas por Cobrar -->
-<div class="modal fade" id="modalImportarCobrar" tabindex="-1">
+<!-- Modal Cargar DTEs Proveedores a Cuentas por Pagar -->
+<div class="modal fade" id="modalImportarPagar" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <div class="modal-header py-3" style="background:linear-gradient(135deg,#065f46,#047857);border:none;">
+            <div class="modal-header py-3" style="background:linear-gradient(135deg,#b45309,#78350f);border:none;">
                 <h6 class="modal-title text-white fw-bold">
-                    <i class="bi bi-cloud-download-fill me-2"></i>Inspección Visual: Cargar DTEs Facto a Cuentas por Cobrar
+                    <i class="bi bi-cloud-download-fill me-2"></i>Inspección Visual: Cargar DTEs Proveedores a Cuentas por Pagar
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
             </div>
             <div class="modal-body p-4">
-                <div class="alert alert-info d-flex align-items-center gap-3 py-2 px-3 mb-3" style="border-radius: 10px; font-size: 0.82rem;">
-                    <i class="bi bi-info-circle-fill text-info fs-5"></i>
+                <div class="alert alert-warning d-flex align-items-center gap-3 py-2 px-3 mb-3" style="border-radius: 10px; font-size: 0.82rem; background-color:#fffbeb; border-color:#fde68a; color:#92400e;">
+                    <i class="bi bi-info-circle-fill text-warning fs-5"></i>
                     <div>
-                        Inspecciona y selecciona los documentos emitidos desde Facto API (<strong>Facturas 33</strong>, <strong>Boletas 39</strong> y <strong>Guías 52</strong>) que deseas trasladar directamente a <strong>Cuentas por Cobrar</strong>.
+                        Inspecciona y selecciona los documentos recibidos de proveedores (<strong>Facturas de Compra 33/34</strong>, <strong>Guías 52</strong>) que deseas trasladar a <strong>Cuentas por Pagar</strong>.
                     </div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded-3 border">
                     <div class="d-flex align-items-center gap-3">
-                        <span class="badge bg-success px-3 py-2 fw-bold" style="font-size:0.85rem;" id="modalImportCountBadge">0 seleccionados</span>
+                        <span class="badge bg-warning text-dark px-3 py-2 fw-bold" style="font-size:0.85rem;" id="modalImportCountBadge">0 seleccionados</span>
                         <span class="text-slate-800 font-monospace fw-bold" style="font-size:0.92rem;" id="modalImportTotalMonto">Total Seleccionado: $0</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -391,7 +382,7 @@
                         <select id="modalEstadoFilter" class="form-select form-select-sm fw-medium" style="width: 215px;" onchange="filtrarModalDocs()">
                             <option value="todos">🌐 Todos los Estados</option>
                             <option value="pendiente" selected>🟡 Pendientes por Cargar</option>
-                            <option value="cobranza">🟢 Ya en Cobranza</option>
+                            <option value="cobranza">🟢 Ya en Cuentas por Pagar</option>
                         </select>
                         <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3 ms-2" onclick="toggleModalCheckAllMaster(this)">
                             <i class="bi bi-check2-all me-1"></i> Marcar / Desmarcar
@@ -409,8 +400,8 @@
                                 <th>Folio</th>
                                 <th>Fecha</th>
                                 <th>Tipo DTE</th>
-                                <th>RUT Cliente</th>
-                                <th>Razón Social</th>
+                                <th>RUT Proveedor</th>
+                                <th>Razón Social Proveedor</th>
                                 <th class="text-end">Monto Total</th>
                                 <th class="text-center">Estado</th>
                             </tr>
@@ -418,8 +409,8 @@
                         <tbody id="modalImportBody">
                             <tr>
                                 <td colspan="8" class="text-center py-5 text-muted">
-                                    <span class="spinner-border spinner-border-sm me-2 text-success"></span>
-                                    Cargando documentos desde Facto API...
+                                    <span class="spinner-border spinner-border-sm me-2 text-warning"></span>
+                                    Cargando documentos de proveedores desde Facto API...
                                 </td>
                             </tr>
                         </tbody>
@@ -428,8 +419,8 @@
             </div>
             <div class="modal-footer border-top bg-light justify-content-between">
                 <button type="button" class="btn btn-sm btn-light px-3 py-2 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-sm btn-success px-4 py-2 fw-bold" id="btnConfirmarImportación" onclick="confirmarImportacionCobrar()">
-                    <i class="bi bi-check-lg me-1"></i> Confirmar e Importar Selección
+                <button type="button" class="btn btn-sm btn-warning text-dark px-4 py-2 fw-bold" id="btnConfirmarImportación" onclick="confirmarImportacionPagar()">
+                    <i class="bi bi-check-lg me-1"></i> Confirmar e Importar a Cuentas por Pagar
                 </button>
             </div>
         </div>
@@ -470,160 +461,131 @@
 <script>
     const baseUrl = '<?= esc($base_url) ?>';
     window.ADMIN_SESSION = <?= json_encode($usuario ?? ['nombre'=>session()->get('Nombre')??'Administrador','apellidos'=>'','email'=>'','rut'=>'','telefono'=>'','estado'=>1,'ultimo_acceso'=>null,'perfil'=>'Administrador']) ?>;
-    window.ADMIN_BASE_URL = "<?= site_url() ?>";
-</script>
-<script src="<?= base_url('public/assets/js/admin.js') ?>"></script>
 
-<script>
-    let currentFactoPage = 1;
+    document.addEventListener('DOMContentLoaded', () => {
+        const hoy = new Date();
+        const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('fechaHoy').textContent = hoy.toLocaleDateString('es-CL', opciones);
+
+        cargarInfoModalAdmin();
+        buscarDocumentos();
+    });
+
     let allFactoDocs = [];
-    let currentFactoTotalMonto = 0;
+    let currentFactoPage = 1;
+    const itemsPerPage = 25;
 
     async function buscarDocumentos() {
-        document.getElementById('checkSelectAll').checked = false;
-        actualizarSeleccion();
+        const tbody = document.getElementById('tableBodyDocs');
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-muted"><span class="spinner-border spinner-border-sm me-2 text-warning"></span>Consultando Facto API Compras...</td></tr>`;
 
-        const cliente    = document.getElementById('filterCliente').value;
-        const numero     = document.getElementById('filterNumero').value;
-        const tipoDte    = document.getElementById('filterTipoDte').value;
+        const cliente = document.getElementById('filterCliente').value;
+        const numero = document.getElementById('filterNumero').value;
+        const tipoDte = document.getElementById('filterTipoDte').value;
         const estadoPago = document.getElementById('filterEstadoPago').value;
-        const fInicio    = document.getElementById('filterFechaInicio').value;
-        const fFin       = document.getElementById('filterFechaFin').value;
+        const fechaInicio = document.getElementById('filterFechaInicio').value;
+        const fechaFin = document.getElementById('filterFechaFin').value;
 
         const params = new URLSearchParams({
             cliente: cliente,
             numero: numero,
             tipo_dte: tipoDte,
             estado_pago: estadoPago,
-            fecha_inicio: fInicio,
-            fecha_fin: fFin
+            fecha_inicio: fechaInicio,
+            fecha_fin: fechaFin
         });
 
-        const tbody = document.getElementById('resultadosBody');
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-primary"></span>Consultando Facto API...</td></tr>`;
-
         try {
-            const response = await fetch(baseUrl + 'cobranza/facto/buscar-dtes?' + params.toString());
+            const response = await fetch(baseUrl + 'facturacion/proveedores/buscar-dtes?' + params.toString());
             const res = await response.json();
 
-            if (res.success && res.data.length > 0) {
-                allFactoDocs = res.data;
-                currentFactoTotalMonto = res.total_monto !== undefined ? res.total_monto : res.data.reduce((s, d) => s + parseFloat(d.total || 0), 0);
-                
-                const totalCount = allFactoDocs.length;
-                document.getElementById('countBadge').textContent = `${totalCount} documentos`;
-                document.getElementById('statTotalCount').textContent = totalCount;
-                document.getElementById('statTotalMonto').textContent = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(currentFactoTotalMonto);
-
-                // Renderizar primera página desde el arreglo local en memoria
-                renderFactoPage(1);
-            } else {
-                allFactoDocs = [];
-                document.getElementById('countBadge').textContent = `0 documentos`;
-                document.getElementById('statTotalCount').textContent = '0';
-                document.getElementById('statTotalMonto').textContent = '$0';
-                
-                let message = 'No se encontraron documentos en Facto API.';
-                if (res.message) {
-                    message = `<span class="text-danger fw-medium">${res.message}</span>`;
-                }
-                
-                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-muted">${message}</td></tr>`;
-                document.getElementById('paginationContainer').style.setProperty('display', 'none', 'important');
+            if (!res.success) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>${res.message || 'Error al obtener datos'}</td></tr>`;
+                return;
             }
-        } catch(e) {
-            allFactoDocs = [];
-            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-danger">Error al consultar Facto API: ${e.message}</td></tr>`;
-            document.getElementById('paginationContainer').style.setProperty('display', 'none', 'important');
+
+            allFactoDocs = res.data || [];
+            document.getElementById('statTotalDocs').textContent = res.count || 0;
+            document.getElementById('statTotalMonto').textContent = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(res.total_monto || 0);
+
+            if (allFactoDocs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-4 d-block mb-2"></i>No se encontraron documentos recibidos con los filtros aplicados.</td></tr>`;
+                document.getElementById('paginationContainer').style.setProperty('display', 'none', 'important');
+                return;
+            }
+
+            renderFactoPage(1);
+
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-danger"><i class="bi bi-wifi-off me-2"></i>Error al conectar con Facto API: ${error.message}</td></tr>`;
         }
     }
 
-    function renderFactoPage(page = 1) {
+    function renderFactoPage(page) {
         currentFactoPage = page;
-        const itemsPerPage = 25;
-        const totalCount = allFactoDocs.length;
-        const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
-        currentFactoPage = Math.max(1, Math.min(currentFactoPage, totalPages));
+        const totalDocs = allFactoDocs.length;
+        const totalPages = Math.max(1, Math.ceil(totalDocs / itemsPerPage));
 
-        const startIdx = (currentFactoPage - 1) * itemsPerPage;
-        const pageItems = allFactoDocs.slice(startIdx, startIdx + itemsPerPage);
+        const startIdx = (page - 1) * itemsPerPage;
+        const endIdx = Math.min(startIdx + itemsPerPage, totalDocs);
+        const pageDocs = allFactoDocs.slice(startIdx, endIdx);
 
-        const tbody = document.getElementById('resultadosBody');
-        tbody.innerHTML = pageItems.map(d => {
-            const netoFmt  = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.neto);
-            const ivaFmt   = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.iva);
+        const tbody = document.getElementById('tableBodyDocs');
+        tbody.innerHTML = pageDocs.map(d => {
             const totalFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(d.total);
-            
-            let badgeClass = 'bg-secondary';
-            if (d.codigo_sii === 33) badgeClass = 'bg-primary-subtle text-primary border border-primary-subtle';
-            else if (d.codigo_sii === 52) badgeClass = 'bg-warning-subtle text-warning border border-warning-subtle';
-            else if (d.codigo_sii === 39) badgeClass = 'bg-success-subtle text-success border border-success-subtle';
-            else if (d.codigo_sii === 61) badgeClass = 'bg-danger-subtle text-danger border border-danger-subtle';
+            const selectClass = `form-select form-select-sm status-select ${d.estado_pago}`;
 
-            const stClass = d.estado_pago || 'pendiente';
-            
             return `
             <tr>
                 <td class="text-center">
                     <input type="checkbox" class="form-check-input doc-checkbox" data-folio="${d.folio}" data-codigo="${d.codigo_sii}" onclick="actualizarSeleccion()">
                 </td>
-                <td class="fw-bold">${d.folio}</td>
-                <td>${d.fecha}</td>
-                <td><span class="badge-dte ${badgeClass}">${d.tipo_documento}</span></td>
-                <td>
-                    <div class="fw-semibold text-slate-800">${d.cliente_nombre}</div>
-                    <div class="text-muted" style="font-size:0.75rem;">${d.cliente_rut}</div>
-                </td>
-                <td class="text-end fw-medium text-slate-600">${netoFmt}</td>
-                <td class="text-end fw-medium text-slate-600">${ivaFmt}</td>
-                <td class="text-end fw-bold text-dark">${totalFmt}</td>
+                <td class="fw-bold text-slate-800">${d.folio}</td>
+                <td class="text-nowrap">${d.fecha}</td>
+                <td><span class="badge bg-light text-dark border">${d.tipo_documento}</span></td>
+                <td class="font-monospace text-slate-600">${d.proveedor_rut || d.cliente_rut}</td>
+                <td class="fw-semibold text-slate-800">${d.proveedor_nombre || d.cliente_nombre}</td>
+                <td class="text-end fw-bold text-slate-900">${totalFmt}</td>
                 <td class="text-center">
-                    <span class="badge ${d.estado_sii === 'Aceptado' ? 'bg-success-subtle text-success border border-success' : 'bg-warning-subtle text-warning border border-warning'}">${d.estado_sii}</span>
+                    <span class="badge ${d.estado_sii === 'Aceptado' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'} border">
+                        ${d.estado_sii}
+                    </span>
                 </td>
                 <td class="text-center">
-                    <select class="form-select form-select-sm status-select ${stClass}" onchange="cambiarEstadoIndividual('${d.folio}', ${d.codigo_sii}, this.value, this)">
-                        <option value="pendiente" ${stClass === 'pendiente' ? 'selected' : ''}>🔴 Pendiente</option>
-                        <option value="pagada" ${stClass === 'pagada' ? 'selected' : ''}>🟢 Pagada</option>
-                        <option value="parcial" ${stClass === 'parcial' ? 'selected' : ''}>🟡 Parcial</option>
+                    <select class="${selectClass}" onchange="cambiarEstadoIndividual('${d.folio}', ${d.codigo_sii}, this.value, this)">
+                        <option value="pendiente" ${d.estado_pago === 'pendiente' ? 'selected' : ''}>🔴 Pendiente</option>
+                        <option value="pagada" ${d.estado_pago === 'pagada' ? 'selected' : ''}>🟢 Pagada</option>
+                        <option value="parcial" ${d.estado_pago === 'parcial' ? 'selected' : ''}>🟡 Parcial</option>
                     </select>
+                </td>
+                <td>
+                    <span class="text-slate-600" style="font-size:0.8rem;">
+                        <i class="bi bi-info-circle me-1 text-muted"></i>${d.observacion}
+                    </span>
                 </td>
             </tr>`;
         }).join('');
 
-        // Renderizar Paginación
+        document.getElementById('countBadge').textContent = `${totalDocs} documentos`;
+        document.getElementById('totalDocsNum').textContent = totalDocs;
+        document.getElementById('currentPageNum').textContent = currentFactoPage;
+        document.getElementById('totalPagesNum').textContent = totalPages;
+
         if (totalPages > 1) {
             document.getElementById('paginationContainer').style.setProperty('display', 'flex', 'important');
-            document.getElementById('currentPageNum').textContent = currentFactoPage;
-            document.getElementById('totalPagesNum').textContent = totalPages;
-            document.getElementById('totalDocsNum').textContent = totalCount;
-
             let pagListHtml = '';
-            
-            // Botón Anterior
             const prevDisabled = currentFactoPage === 1 ? 'disabled' : '';
             pagListHtml += `<li class="page-item ${prevDisabled}"><a class="page-link" href="#" onclick="changePage(event, ${currentFactoPage - 1})"><i class="bi bi-chevron-left"></i></a></li>`;
 
-            // Rango de páginas inteligentes
-            const range = 2;
-            let startPage = Math.max(1, currentFactoPage - range);
-            let endPage = Math.min(totalPages, currentFactoPage + range);
-
-            if (startPage > 1) {
-                pagListHtml += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(event, 1)">1</a></li>`;
-                if (startPage > 2) pagListHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentFactoPage - 1 && i <= currentFactoPage + 1)) {
+                    const activeClass = i === currentFactoPage ? 'active' : '';
+                    pagListHtml += `<li class="page-item ${activeClass}"><a class="page-link" href="#" onclick="changePage(event, ${i})">${i}</a></li>`;
+                } else if (i === currentFactoPage - 2 || i === currentFactoPage + 2) {
+                    pagListHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
             }
 
-            for (let i = startPage; i <= endPage; i++) {
-                const activeClass = i === currentFactoPage ? 'active' : '';
-                pagListHtml += `<li class="page-item ${activeClass}"><a class="page-link" href="#" onclick="changePage(event, ${i})">${i}</a></li>`;
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) pagListHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-                pagListHtml += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(event, ${totalPages})">${totalPages}</a></li>`;
-            }
-
-            // Botón Siguiente
             const nextDisabled = currentFactoPage === totalPages ? 'disabled' : '';
             pagListHtml += `<li class="page-item ${nextDisabled}"><a class="page-link" href="#" onclick="changePage(event, ${currentFactoPage + 1})"><i class="bi bi-chevron-right"></i></a></li>`;
 
@@ -638,7 +600,6 @@
         renderFactoPage(page);
     }
 
-    // ── Selección Masiva Checkbox ────────────────────────────────
     function toggleSelectAll(headerCheck) {
         const checkboxes = document.querySelectorAll('.doc-checkbox');
         checkboxes.forEach(c => c.checked = headerCheck.checked);
@@ -658,12 +619,11 @@
         }
     }
 
-    // ── Actualización Individual ────────────────────────────────
     async function cambiarEstadoIndividual(folio, codigoSii, nuevoEstado, selectElem) {
         selectElem.className = `form-select form-select-sm status-select ${nuevoEstado}`;
 
         try {
-            const response = await fetch(baseUrl + 'cobranza/facto/actualizar-estado-pago', {
+            const response = await fetch(baseUrl + 'facturacion/proveedores/actualizar-estado-pago', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -685,7 +645,6 @@
         }
     }
 
-    // ── Actualización Masiva Combo Box ──────────────────────────
     async function aplicarAccionMasiva() {
         const selected = document.querySelectorAll('.doc-checkbox:checked');
         if (selected.length === 0) {
@@ -700,7 +659,7 @@
         }));
 
         try {
-            const response = await fetch(baseUrl + 'cobranza/facto/actualizar-estado-masivo', {
+            const response = await fetch(baseUrl + 'facturacion/proveedores/actualizar-estado-masivo', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -712,7 +671,6 @@
 
             if (res.success) {
                 mostrarToast(res.message, 'success');
-                // Actualizar estado en memoria local y re-renderizar
                 documentos.forEach(d => {
                     const found = allFactoDocs.find(x => String(x.folio) === String(d.folio) && parseInt(x.codigo_sii) === parseInt(d.codigo_sii));
                     if (found) found.estado_pago = nuevoEstado;
@@ -731,29 +689,29 @@
         buscarDocumentos();
     }
 
-    // ── Modal Inspección Visual e Importación a Cuentas por Cobrar ──────────────
+    // ── Modal Inspección Visual e Importación a Cuentas por Pagar ──────────────
     let modalDocsData = [];
 
-    async function abrirModalImportarCobrar() {
-        const modalElem = new bootstrap.Modal(document.getElementById('modalImportarCobrar'));
+    async function abrirModalImportarPagar() {
+        const modalElem = new bootstrap.Modal(document.getElementById('modalImportarPagar'));
         modalElem.show();
 
         const tbody = document.getElementById('modalImportBody');
-        
-        // Consultar siempre la API al abrir para obtener los DTEs más recientes de hoy
-        modalDocsData = [];
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-success"></span>Cargando DTEs desde Facto API...</td></tr>`;
-        try {
-            const response = await fetch(baseUrl + 'cobranza/facto/buscar-dtes?estado_pago=pendiente');
-            const res = await response.json();
-            if (res.success) {
-                modalDocsData = res.data || [];
-            } else {
-                modalDocsData = allFactoDocs;
+
+        if (modalDocsData.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-warning"></span>Cargando DTEs proveedores desde Facto API...</td></tr>`;
+            try {
+                const response = await fetch(baseUrl + 'facturacion/proveedores/buscar-dtes?estado_pago=pendiente');
+                const res = await response.json();
+                if (res.success) {
+                    modalDocsData = res.data || [];
+                } else {
+                    modalDocsData = allFactoDocs;
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-danger">Error al cargar DTEs: ${e.message}</td></tr>`;
+                return;
             }
-        } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-danger">Error al cargar DTEs: ${e.message}</td></tr>`;
-            return;
         }
 
         renderModalDocs();
@@ -774,15 +732,14 @@
             return;
         }
 
-        // Filtrado ultrarrápido en memoria JS del cliente (0 ms)
         let filtered = modalDocsData.filter(d => {
             const obs = d.observacion || '';
             if (filterVal === 'pendiente') {
                 return obs.includes('Pendiente por Cargar');
             } else if (filterVal === 'cobranza') {
-                return obs.includes('Cuentas por Cobrar');
+                return obs.includes('Cuentas por Pagar');
             }
-            return true; // 'todos'
+            return true;
         });
 
         if (filtered.length === 0) {
@@ -791,12 +748,10 @@
             return;
         }
 
-        // Ordenar: Los DTEs "Pendiente por Cargar" al inicio, y secundariamente por FECHA DESCENDENTE (lo más reciente de HOY arriba)
         filtered.sort((a, b) => {
             const isAPend = (a.observacion || '').includes('Pendiente por Cargar') ? 0 : 1;
             const isBPend = (b.observacion || '').includes('Pendiente por Cargar') ? 0 : 1;
-            if (isAPend !== isBPend) return isAPend - isBPend;
-            return (b.fecha || '').localeCompare(a.fecha || '');
+            return isAPend - isBPend;
         });
 
         tbody.innerHTML = filtered.map((d) => {
@@ -806,14 +761,14 @@
             let badgeClass = 'bg-secondary';
             if (d.codigo_sii === 33) badgeClass = 'bg-primary-subtle text-primary border border-primary-subtle';
             else if (d.codigo_sii === 52) badgeClass = 'bg-warning-subtle text-warning border border-warning-subtle';
-            else if (d.codigo_sii === 39) badgeClass = 'bg-success-subtle text-success border border-success-subtle';
+            else if (d.codigo_sii === 34) badgeClass = 'bg-info-subtle text-info border border-info-subtle';
 
             const esPendienteCarga = (d.observacion || '').includes('Pendiente por Cargar');
             const isChecked = esPendienteCarga ? 'checked' : '';
             
             const estadoBadge = esPendienteCarga
                 ? `<span class="badge bg-warning-subtle text-dark border border-warning fw-bold"><i class="bi bi-clock-history me-1"></i>Pendiente por Cargar</span>`
-                : `<span class="badge bg-success-subtle text-success border border-success fw-bold"><i class="bi bi-check-circle me-1"></i>Ya en Cobranza</span>`;
+                : `<span class="badge bg-success-subtle text-success border border-success fw-bold"><i class="bi bi-check-circle me-1"></i>Ya en Cuentas por Pagar</span>`;
 
             return `
             <tr class="${esPendienteCarga ? 'table-warning bg-warning-subtle' : ''}">
@@ -823,8 +778,8 @@
                 <td class="fw-bold">${d.folio}</td>
                 <td>${d.fecha}</td>
                 <td><span class="badge ${badgeClass}">${d.tipo_documento}</span></td>
-                <td class="font-monospace">${d.cliente_rut}</td>
-                <td class="fw-semibold text-slate-800">${d.cliente_nombre}</td>
+                <td class="font-monospace">${d.proveedor_rut || d.cliente_rut}</td>
+                <td class="fw-semibold text-slate-800">${d.proveedor_nombre || d.cliente_nombre}</td>
                 <td class="text-end fw-bold text-dark">${totalFmt}</td>
                 <td class="text-center">${estadoBadge}</td>
             </tr>`;
@@ -861,7 +816,7 @@
         document.getElementById('modalImportTotalMonto').textContent = `Total Seleccionado: ` + new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(sumTotal);
     }
 
-    async function confirmarImportacionCobrar() {
+    async function confirmarImportacionPagar() {
         const selected = document.querySelectorAll('.modal-doc-checkbox:checked');
         if (selected.length === 0) {
             mostrarToast('Seleccione al menos un documento para trasladar', 'warning');
@@ -878,7 +833,7 @@
         }).filter(Boolean);
 
         try {
-            const response = await fetch(baseUrl + 'cobranza/facto/importar-a-cobrar', {
+            const response = await fetch(baseUrl + 'facturacion/proveedores/importar-a-pagar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ documentos: docsToImport })
@@ -887,11 +842,11 @@
             const res = await response.json();
 
             btnConfirmar.disabled = false;
-            btnConfirmar.innerHTML = `<i class="bi bi-check-lg me-1"></i> Confirmar e Importar Selección`;
+            btnConfirmar.innerHTML = `<i class="bi bi-check-lg me-1"></i> Confirmar e Importar a Cuentas por Pagar`;
 
             if (res.success) {
                 mostrarToast(res.message, 'success');
-                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalImportarCobrar'));
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalImportarPagar'));
                 if (modalInstance) modalInstance.hide();
                 modalDocsData = [];
                 buscarDocumentos();
@@ -900,7 +855,7 @@
             }
         } catch (e) {
             btnConfirmar.disabled = false;
-            btnConfirmar.innerHTML = `<i class="bi bi-check-lg me-1"></i> Confirmar e Importar Selección`;
+            btnConfirmar.innerHTML = `<i class="bi bi-check-lg me-1"></i> Confirmar e Importar a Cuentas por Pagar`;
             mostrarToast('Error de conexión con el servidor', 'danger');
         }
     }
@@ -921,10 +876,41 @@
         setTimeout(() => { toastWrapper.innerHTML = ''; }, 3500);
     }
 
-    // Carga inicial al cargar la página
-    document.addEventListener('DOMContentLoaded', () => {
-        buscarDocumentos(1);
-    });
+    function abrirModalAdmin() {
+        const modalAdmin = new bootstrap.Modal(document.getElementById('modalAdminInfo'));
+        modalAdmin.show();
+    }
+
+    function cargarInfoModalAdmin() {
+        const user = window.ADMIN_SESSION || {};
+        const avatar = document.getElementById('modalAdminAvatar');
+        const topbarAvatar = document.getElementById('topbarAvatar');
+
+        const iniciales = ((user.nombre ? user.nombre[0] : 'A') + (user.apellidos ? user.apellidos[0] : '')).toUpperCase();
+
+        if (avatar) avatar.textContent = iniciales;
+        if (topbarAvatar) topbarAvatar.textContent = iniciales;
+
+        document.getElementById('topbarNombre').textContent = user.nombre ? `${user.nombre} ${user.apellidos || ''}` : 'Administrador';
+        document.getElementById('topbarRol').textContent = user.perfil || 'Administrador';
+
+        document.getElementById('modalAdminNombre').textContent = user.nombre ? `${user.nombre} ${user.apellidos || ''}` : 'Administrador';
+        document.getElementById('modalAdminPerfil').textContent = user.perfil || 'Administrador';
+
+        const rowsContainer = document.getElementById('modalAdminRows');
+        if (rowsContainer) {
+            rowsContainer.innerHTML = `
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.82rem;">
+                    <span style="color:var(--text-sub);">Email</span><span style="font-weight:600;">${user.email || '—'}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.82rem;">
+                    <span style="color:var(--text-sub);">RUT</span><span style="font-weight:600;">${user.rut || '—'}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.82rem;">
+                    <span style="color:var(--text-sub);">Teléfono</span><span style="font-weight:600;">${user.telefono || '—'}</span>
+                </div>`;
+        }
+    }
 </script>
 </body>
 </html>

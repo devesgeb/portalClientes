@@ -16,8 +16,7 @@ class App extends BaseConfig
    *
    * E.g., http://example.com/
    */
-  // baseURL se detecta automaticamente segun el host del servidor
-  public string $baseURL = '';
+  public string $baseURL = 'http://localhost/Portal/';
 
 
 

@@ -101,19 +101,22 @@
 
         /* ── Preview ────────────────────────────── */
         .preview-wrap {
-            border-radius: 12px; overflow: hidden;
+            border-radius: 12px;
             border: 1px solid #ede9fe;
-            max-height: 260px; overflow-y: auto;
+            max-height: 380px;
+            overflow-x: auto !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
         }
         .price-pane .preview-wrap { border-color: #a7f3d0; }
-        .preview-wrap table { min-width: 100%; font-size: .76rem; margin: 0; }
+        .preview-wrap table { min-width: max-content; font-size: .78rem; margin: 0; }
         .preview-wrap thead th {
             background: #f5f0ff; color: #5b21b6;
             font-weight: 600; position: sticky; top: 0; z-index: 2;
-            padding: 8px 10px; white-space: nowrap;
+            padding: 8px 12px; white-space: nowrap;
         }
         .price-pane .preview-wrap thead th { background: #d1fae5; color: #065f46; }
-        .preview-wrap tbody td { padding: 5px 10px; }
+        .preview-wrap tbody td { padding: 6px 12px; white-space: nowrap; }
         .preview-wrap tbody tr:hover { background: #faf8ff; }
         .price-pane .preview-wrap tbody tr:hover { background: #f0fdf4; }
 
@@ -565,13 +568,14 @@ function procesarArchivoFile(file, tipo) {
 function renderPreview(rows, T) {
     if (!rows.length) return;
     const cols   = Object.keys(rows[0]);
-    const sample = rows.slice(0, 5);
+    const limit  = Math.min(rows.length, 25);
+    const sample = rows.slice(0, limit);
     let html = '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
     sample.forEach(r => {
         html += '<tr>' + cols.map(c => `<td>${r[c] ?? ''}</td>`).join('') + '</tr>';
     });
-    if (rows.length > 5) {
-        html += `<tr><td colspan="${cols.length}" style="text-align:center;color:#94a3b8;font-style:italic;padding:8px;">…y ${rows.length - 5} filas más</td></tr>`;
+    if (rows.length > limit) {
+        html += `<tr><td colspan="${cols.length}" style="text-align:center;color:#94a3b8;font-style:italic;padding:10px;background:#f8fafc;">…y ${rows.length - limit} filas más por procesar</td></tr>`;
     }
     html += '</tbody>';
     document.getElementById('table' + T).innerHTML = html;

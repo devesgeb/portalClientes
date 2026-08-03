@@ -87,7 +87,11 @@ window.DocumentosModule = (function () {
         const tbody = document.getElementById(cfg.tbody);
         if (!tbody) return;
         tbody.innerHTML = '';
-        const dbFull = cfg.db();
+        const dbFull = [...cfg.db()].sort((a, b) => {
+            const nameA = (a.nombre || a.cliente || a.proveedor || '').trim();
+            const nameB = (b.nombre || b.cliente || b.proveedor || '').trim();
+            return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+        });
         const totalFull = dbFull.reduce((s, r) => s + (r.monto || 0), 0);
 
         const query = _filterQuery[cfg.tipo] || '';
@@ -255,7 +259,19 @@ window.DocumentosModule = (function () {
                 r.rut = rut;
                 if (r.docs) r.docs.forEach(d => { d.rut = rut; });
                 const cantDocs = r.docs ? r.docs.length : 0;
-                if (cantDocs <= 1) r.monto = monto;
+                if (cantDocs <= 1 && r.docs && r.docs.length > 0) {
+                    r.monto = monto;
+                    r.docs[0].total = monto;
+                    r.docs[0].monto = monto;
+                    const pagado = parseFloat(r.docs[0].pagado ?? 0);
+                    r.docs[0].impago = Math.max(0, monto - pagado);
+                } else if (cantDocs === 0) {
+                    r.monto = monto;
+                    r.docs = [{
+                        tipo: 'N/A', nro: 'N/A', fecha: new Date().toISOString().slice(0, 10),
+                        total: monto, pagado: 0, impago: monto, monto: monto, rut: rut
+                    }];
+                }
             }
         } else {
             // Nuevo: leer datos del documento
@@ -287,8 +303,9 @@ window.DocumentosModule = (function () {
                 } catch (_) { /* continuar si falla la verificación online */ }
             }
 
-            const rutNorm = rut.replace(/\s/g, '').toLowerCase();
-            const existente = db.find(x => (x.rut || '').replace(/\s/g, '').toLowerCase() === rutNorm);
+            const _normRut = rut => (rut || '').toString().replace(/[\s\.\-]/g, '').toUpperCase();
+            const rutNorm = _normRut(rut);
+            const existente = db.find(x => _normRut(x.rut) === rutNorm);
 
             if (existente) {
                 const nroEnCliente = existente.docs?.find(d => (d.nro || '').trim() === nroDoc);
@@ -595,15 +612,17 @@ window.DocumentosModule = (function () {
             const rutKey = cfg.tipo === 'cobrar' ? 'rut_cliente' : 'rut_proveedor';
             const nameKey = cfg.tipo === 'cobrar' ? 'nombre_cliente' : 'nombre_proveedor';
 
+            const _normRut = rut => (rut || '').toString().replace(/[\s\.\-]/g, '').toUpperCase();
             (data.registros || []).forEach(row => {
-                const rut = row[rutKey] || '';
-                const key = rut || row[nameKey] || 'sin-rut-' + autoId;
+                const rawRut = row[rutKey] || '';
+                const rutClean = _normRut(rawRut);
+                const key = rutClean || (row[nameKey] || '').trim().toLowerCase() || ('sin-rut-' + autoId);
                 if (!mapa[key]) {
-                    const nombre = row[nameKey] || row.razon_social || rut || 'Sin nombre';
+                    const nombre = row[nameKey] || row.razon_social || rawRut || 'Sin nombre';
                     mapa[key] = {
                         id: autoId++,
                         nombre, cliente: nombre, proveedor: nombre,
-                        rut, monto: 0, enBD: true, docs: [],
+                        rut: rawRut || rutClean, monto: 0, enBD: true, docs: [],
                     };
                 }
                 const impago = parseFloat(row.impago ?? 0);
@@ -618,9 +637,15 @@ window.DocumentosModule = (function () {
                 });
             });
 
-            // Preservar items locales no guardados
-            const pending = cfg.db().filter(c => c.enBD === false);
-// Solo mostrar entidades con monto > 0 (cobrar y pagar)
+            // Preservar solo items locales no guardados que NO estén ya presentes en la base de datos
+            const dbRuts = new Set(Object.keys(mapa));
+            const pending = cfg.db().filter(c => {
+                if (c.enBD !== false) return false;
+                const clean = _normRut(c.rut);
+                return clean && !dbRuts.has(clean);
+            });
+
+            // Solo mostrar entidades con monto > 0 (cobrar y pagar)
             const entries = Object.values(mapa).filter(e => e.monto > 0);
             cfg.setDb([...entries, ...pending]);
             cfg.resetNextId(autoId + 10);
@@ -661,7 +686,7 @@ window.DocumentosModule = (function () {
                 const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
                 if (!rawData.length || rawData.length < 2) { PortalApp.toast('Archivo vacío', 'warning'); return; }
 
-                // Columnas requeridas: Tipo Documento | Numero | Emisor/Receptor | Rut | Fecha | Total | Pagado | Impago | Estado
+                // Columnas requeridas: Tipo Documento | Numero | Emisor/Receptor | Rut | Fecha | Total | Impago | Estado
                 const patterns = {
                     emisor: { regex: /emisor.{0,3}receptor|empresa|razon.?social|cliente|proveedor|receptor|emisor|nombre/i },
                     tipo:   { regex: /tipo.{0,4}doc|tipo/i },
@@ -669,7 +694,6 @@ window.DocumentosModule = (function () {
                     rut:    { regex: /rut|rut.?cliente|rut.?emisor|rut.?receptor/i },
                     fecha:  { regex: /fecha|f\.?emisi[oó]n|f\.?vencimiento|emisi[oó]n|f_emision|f\.doc/i },
                     total:  { regex: /total|monto.?total|monto|valor|monto.?doc/i },
-                    pagado: { regex: /pagado|monto.?pagado|abono/i },
                     impago: { regex: /impago|saldo.?pendiente|monto.?impago|saldo|deuda|pendiente/i },
                     estado: { regex: /estado|condici[oó]n|situaci[oó]n/i },
                 };
@@ -763,12 +787,12 @@ window.DocumentosModule = (function () {
                 rows.forEach(row => {
                     const nombre = String(row[colMap.emisor] || '').trim();
                     if (!nombre) return;
-                    const rut = colMap.rut ? String(row[colMap.rut]).trim() : '';
+                    let rut = (colMap.rut && row[colMap.rut] !== undefined && row[colMap.rut] !== null) ? String(row[colMap.rut]).trim() : '';
+                    if (rut.toLowerCase() === 'undefined' || rut.toLowerCase() === 'null') rut = '';
                     const key = rut ? `${nombre}||${rut}` : nombre;
 
-                    let impago = colMap.impago ? parseNum(row[colMap.impago]) : 0;
-                    let pagado = colMap.pagado ? parseNum(row[colMap.pagado]) : 0;
-                    let total  = colMap.total ? parseNum(row[colMap.total]) : 0;
+                    let impago = colMap.impago ? parseNum(row[colMap.impago]) : (colMap.total ? parseNum(row[colMap.total]) : 0);
+                    let total  = colMap.total ? parseNum(row[colMap.total]) : impago;
                     const estadoStr = colMap.estado ? String(row[colMap.estado]).trim().toLowerCase() : '';
 
                     // Si el estado indica que está pagada / conciliada / cancelada:
@@ -776,35 +800,27 @@ window.DocumentosModule = (function () {
 
                     if (esPagadoPorEstado) {
                         impago = 0;
-                        if (total > 0 && pagado === 0) pagado = total;
-                    } else {
-                        if (impago === 0 && pagado > 0 && total > pagado) {
-                            impago = total - pagado;
-                        } else if (impago === 0 && pagado === 0 && colMap.total && !colMap.impago && !colMap.pagado) {
-                            impago = total;
-                        }
                     }
 
                     // Ignorar documentos que estén completamente pagados (impago <= 0)
-                    if (impago <= 0 && (pagado >= total || esPagadoPorEstado || colMap.impago)) {
+                    if (impago <= 0) {
                         return; // Omitir documentos ya pagados
                     }
 
-                    if (!grupos[key]) grupos[key] = { nombre, rut, docs: [], impago: 0, pagado: 0 };
+                    if (!grupos[key]) grupos[key] = { nombre, rut, docs: [], impago: 0 };
                     const fecha = colMap.fecha ? parseFecha(row[colMap.fecha]) : '—';
                     const tipo = colMap.tipo ? String(row[colMap.tipo]).trim() : '—';
                     const nro = colMap.nro ? String(row[colMap.nro]).trim() : '—';
 
-                    grupos[key].docs.push({ tipo, nro, fecha, total, impago, pagado, rut });
+                    grupos[key].docs.push({ tipo, nro, fecha, total, impago, pagado: 0, rut });
                     grupos[key].impago += impago;
-                    grupos[key].pagado += pagado;
                 });
 
                 _excelData[cfg.tipo] = Object.values(grupos)
-                    .filter(d => d.impago > 0 || d.pagado > 0 || (d.docs.length > 0 && d.docs.some(doc => doc.total > 0)))
+                    .filter(d => d.impago > 0 || (d.docs.length > 0 && d.docs.some(doc => doc.impago > 0)))
                     .map(d => ({
                         nombre: d.nombre, cliente: d.nombre, proveedor: d.nombre,
-                        rut: d.rut, monto: d.impago, pagado: d.pagado, docs: d.docs,
+                        rut: d.rut, monto: d.impago, docs: d.docs,
                     }));
 
                 _mostrarPreviewExcel(cfg, _excelData[cfg.tipo]);

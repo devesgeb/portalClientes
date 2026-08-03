@@ -105,100 +105,71 @@ class FactoController extends BaseController
         $todayDate  = date('Y-m-d');
         $db = \Config\Database::connect();
 
-        // ── MODO PENDIENTES: Búsqueda acelerada de folios impagos BD + HOY ──
-        if ($estadoFiltro === 'pendiente') {
-            $pendingFoliosList = [];
+        // 1. Si no hay fecha de inicio explícita ni folio puntual, consultar a Facto API trayendo HOY y el AÑO ACTUAL (desde 2026-01-01)
+        if (!$fechaInicio && $numero === '') {
+            // A. DTEs de HOY
+            $todayParams = $queryParams;
+            $todayParams['issue_date_from'] = $todayDate;
+            $todayParams['limit'] = 100;
+            $urlToday = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($todayParams);
 
-            // A. Obtener folios impagos de tbl_documentos_cobrar
-            $cobrarFolios = $db->table('tbl_documentos_cobrar')->select('numero')->where('impago >', 0)->get()->getResultArray();
-            foreach ($cobrarFolios as $cf) {
-                $f = trim((string)$cf['numero']);
-                if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
-                    $pendingFoliosList[] = $f;
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $urlToday);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
+            $respToday = curl_exec($ch);
+            $codeToday = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($codeToday === 200 && $respToday) {
+                $dToday = json_decode($respToday, true);
+                $itemsToday = $dToday['_embedded']['documents'] ?? $dToday['_embedded']['items'] ?? [];
+                foreach ($itemsToday as $it) {
+                    $rawItems[] = $it;
                 }
             }
 
-            // B. Obtener folios impagos de tbl_documentos_pagar si existe
-            if ($db->tableExists('tbl_documentos_pagar')) {
-                $pagarFolios = $db->table('tbl_documentos_pagar')->select('numero')->where('impago >', 0)->get()->getResultArray();
-                foreach ($pagarFolios as $pf) {
-                    $f = trim((string)$pf['numero']);
-                    if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
-                        $pendingFoliosList[] = $f;
-                    }
-                }
-            }
+            // B. DTEs del Año Actual (desde 2026-01-01) con paginación
+            $yearParams = $queryParams;
+            $yearParams['issue_date_from'] = date('Y-01-01');
+            $yearParams['limit'] = 100;
 
-            // C. Traer primero documentos de HOY de Facto API si no hay filtro de fecha cerrado
-            if (!$fechaInicio && !$fechaFin) {
-                $todayParams = $queryParams;
-                $todayParams['issue_date_from'] = $todayDate;
-                $todayParams['issue_date_to']   = $todayDate;
-                $todayParams['page']            = 1;
+            for ($page = 1; $page <= 5; $page++) {
+                $yearParams['page'] = $page;
+                $urlYear = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($yearParams);
 
-                $todayUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($todayParams);
                 $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $todayUrl);
+                curl_setopt($ch, CURLOPT_URL, $urlYear);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
                 curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-                $resToday = curl_exec($ch);
+                $respYear = curl_exec($ch);
+                $codeYear = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
-                if ($resToday) {
-                    $dToday = json_decode($resToday, true);
-                    $docsToday = $dToday['_embedded']['documents'] ?? $dToday['_embedded']['items'] ?? [];
-                    if (!empty($docsToday)) {
-                        $rawItems = array_merge($rawItems, $docsToday);
+
+                if ($codeYear === 200 && $respYear) {
+                    $dYear = json_decode($respYear, true);
+                    $itemsYear = $dYear['_embedded']['documents'] ?? $dYear['_embedded']['items'] ?? [];
+                    if (empty($itemsYear)) {
+                        break;
                     }
-                }
-            }
-
-            // D. Consultar folios impagos de la BD vía curl_multi paralelo contra Facto API
-            if (!empty($pendingFoliosList)) {
-                $mh = curl_multi_init();
-                $handles = [];
-                $existingFolios = array_filter(array_column($rawItems, 'document_number'));
-
-                foreach ($pendingFoliosList as $f) {
-                    if (in_array((string)$f, array_map('strval', $existingFolios), true)) continue;
-
-                    $pParams = $queryParams;
-                    $pParams['document_number'] = $f;
-                    $pUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($pParams);
-
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_URL, $pUrl);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-                    curl_multi_add_handle($mh, $ch);
-                    $handles[$f] = $ch;
-                }
-
-                if (!empty($handles)) {
-                    $running = null;
-                    do {
-                        curl_multi_exec($mh, $running);
-                        curl_multi_select($mh, 1);
-                    } while ($running > 0);
-
-                    foreach ($handles as $f => $ch) {
-                        $resP = curl_multi_getcontent($ch);
-                        $dP = json_decode($resP, true);
-                        $dList = $dP['_embedded']['documents'] ?? $dP['_embedded']['items'] ?? [];
-                        if (!empty($dList)) {
-                            foreach ($dList as $docObj) {
-                                $rawItems[] = $docObj;
-                            }
+                    $existingIds = array_filter(array_column($rawItems, 'document_id'));
+                    foreach ($itemsYear as $it) {
+                        $dId = $it['document_id'] ?? null;
+                        if ($dId && !in_array($dId, $existingIds, true)) {
+                            $rawItems[] = $it;
                         }
-                        curl_multi_remove_handle($mh, $ch);
-                        curl_close($ch);
                     }
+                    if (count($itemsYear) < 100) {
+                        break;
+                    }
+                } else {
+                    break;
                 }
-                curl_multi_close($mh);
             }
         } else {
-            // Modo Normal: Consulta paginada directa a Facto API
+            // Consulta normal con filtros de usuario
             $currentParams = $queryParams;
             $currentParams['page'] = $requestedPage;
             $url = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($currentParams);
@@ -215,8 +186,98 @@ class FactoController extends BaseController
             if ($httpCode === 200 && $response) {
                 $data = json_decode($response, true);
                 $rawItems = $data['_embedded']['documents'] ?? $data['_embedded']['items'] ?? [];
-                $totalItems = (int) ($data['total_items'] ?? count($rawItems));
-                $totalPages = (int) ($data['page_count'] ?? 1);
+            }
+        }
+
+        // 2. Si el filtro es "pendiente", complementar además con folios impagos de la BD que no hayan venido en la página actual
+        if ($estadoFiltro === 'pendiente') {
+            $pendingFoliosList = [];
+
+            // A. Folios pendientes en tbl_facto_pagos
+            if ($db->tableExists('tbl_facto_pagos')) {
+                $factoFolios = $db->table('tbl_facto_pagos')->select('folio')->where('estado_pago', 'pendiente')->get()->getResultArray();
+                foreach ($factoFolios as $ff) {
+                    $f = trim((string)$ff['folio']);
+                    if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
+                        $pendingFoliosList[] = $f;
+                    }
+                }
+            }
+
+            // B. Folios impagos en tbl_documentos_cobrar
+            if ($db->tableExists('tbl_documentos_cobrar')) {
+                $cobrarFolios = $db->table('tbl_documentos_cobrar')->select('numero')->where('impago >', 0)->get()->getResultArray();
+                foreach ($cobrarFolios as $cf) {
+                    $f = trim((string)$cf['numero']);
+                    if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
+                        $pendingFoliosList[] = $f;
+                    }
+                }
+            }
+
+            // C. Consultar folios de la BD faltantes vía cURL multi en lotes de 15 peticiones paralelas
+            if (!empty($pendingFoliosList)) {
+                $existingFolios = array_filter(array_column($rawItems, 'document_number'));
+                $foliosToFetch = [];
+                foreach ($pendingFoliosList as $f) {
+                    if (!in_array((string)$f, array_map('strval', $existingFolios), true)) {
+                        $foliosToFetch[] = $f;
+                    }
+                }
+
+                if (!empty($foliosToFetch)) {
+                    $chunks = array_chunk($foliosToFetch, 15);
+                    foreach ($chunks as $chunk) {
+                        $mh = curl_multi_init();
+                        $handles = [];
+                        foreach ($chunk as $f) {
+                            $pParams = $queryParams;
+                            $pParams['document_number'] = $f;
+                            $pUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($pParams);
+
+                            $ch = curl_init();
+                            curl_setopt($ch, CURLOPT_URL, $pUrl);
+                            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
+                            curl_multi_add_handle($mh, $ch);
+                            $handles[$f] = $ch;
+                        }
+
+                        if (!empty($handles)) {
+                            $active = null;
+                            do {
+                                $mrc = curl_multi_exec($mh, $active);
+                            } while ($mrc === CURLM_CALL_MULTI_PERFORM);
+
+                            while ($active && $mrc === CURLM_OK) {
+                                if (curl_multi_select($mh) === -1) {
+                                    usleep(500);
+                                }
+                                do {
+                                    $mrc = curl_multi_exec($mh, $active);
+                                } while ($mrc === CURLM_CALL_MULTI_PERFORM);
+                            }
+
+                            foreach ($handles as $f => $ch) {
+                                $resP = curl_multi_getcontent($ch);
+                                if ($resP) {
+                                    $dP = json_decode($resP, true);
+                                    $dList = $dP['_embedded']['documents'] ?? $dP['_embedded']['items'] ?? [];
+                                    if (!empty($dList)) {
+                                        foreach ($dList as $docObj) {
+                                            $rawItems[] = $docObj;
+                                        }
+                                    }
+                                }
+                                curl_multi_remove_handle($mh, $ch);
+                                curl_close($ch);
+                            }
+                        }
+                        curl_multi_close($mh);
+                    }
+                }
             }
         }
 
@@ -251,7 +312,7 @@ class FactoController extends BaseController
             $folioClean = ltrim($folioRaw, '0');
             $impago     = (float)($c['impago'] ?? 0);
             $pagado     = (float)($c['pagado'] ?? 0);
-            $st         = ($pagado > 0) ? 'parcial' : 'pendiente';
+            $st         = 'pendiente';
 
             $dataItem = [
                 'estado_pago'  => $st,
@@ -329,26 +390,34 @@ class FactoController extends BaseController
             $localKey      = $folioDoc . '_' . $taxBureauCode;
             $folioDocClean = ltrim($folioDoc, '0');
 
-            if (isset($estadosLocales[$localKey])) {
-                $estadoPago  = $estadosLocales[$localKey]['estado_pago'];
-                $montoPagado = $estadosLocales[$localKey]['monto_pagado'];
-                $obs         = $estadosLocales[$localKey]['observacion'];
-            } elseif ($docFecha === $todayDate) {
-                $estadoPago  = 'pendiente';
-                $montoPagado = 0.0;
-                $obs         = 'Emitida hoy (' . $docFecha . ') - Pendiente';
-            } elseif (isset($pendientesPorFolio[$folioDoc])) {
+            if (isset($pendientesPorFolio[$folioDoc])) {
                 $estadoPago  = $pendientesPorFolio[$folioDoc]['estado_pago'];
                 $montoPagado = $pendientesPorFolio[$folioDoc]['monto_pagado'];
-                $obs         = $pendientesPorFolio[$folioDoc]['observacion'];
+                $total       = $pendientesPorFolio[$folioDoc]['impago'];
+                $obs         = 'Cuentas por Cobrar (Deuda Impaga)';
             } elseif (isset($pendientesPorFolio[$folioDocClean])) {
                 $estadoPago  = $pendientesPorFolio[$folioDocClean]['estado_pago'];
                 $montoPagado = $pendientesPorFolio[$folioDocClean]['monto_pagado'];
-                $obs         = $pendientesPorFolio[$folioDocClean]['observacion'];
+                $total       = $pendientesPorFolio[$folioDocClean]['impago'];
+                $obs         = 'Cuentas por Cobrar (Deuda Impaga)';
+            } elseif (isset($estadosLocales[$localKey])) {
+                $estadoPago  = $estadosLocales[$localKey]['estado_pago'];
+                $montoPagado = $estadosLocales[$localKey]['monto_pagado'];
+                $obs         = ($estadosLocales[$localKey]['observacion'] === 'Cuentas por Cobrar (Deuda Impaga)')
+                               ? 'Pendiente por Cargar a Cuentas por Cobrar'
+                               : $estadosLocales[$localKey]['observacion'];
+            } elseif ($docFecha === $todayDate) {
+                $estadoPago  = 'pendiente';
+                $montoPagado = 0.0;
+                $obs         = 'Emitida hoy (' . $docFecha . ') - Pendiente por Cargar';
+            } elseif (!empty($docFecha) && $docFecha >= '2026-01-01') {
+                $estadoPago  = 'pendiente';
+                $montoPagado = 0.0;
+                $obs         = 'Pendiente por Cargar a Cuentas por Cobrar';
             } else {
                 $estadoPago  = 'pagada';
                 $montoPagado = $total;
-                $obs         = 'Conciliado (Sin deuda impaga)';
+                $obs         = 'Conciliado (Histórico)';
             }
 
             // Filtrar si el usuario seleccionó un estado de pago específico
@@ -376,27 +445,40 @@ class FactoController extends BaseController
             ];
         }
 
-        $countResult = count($documentos);
-        if ($estadoFiltro !== '' || $numero !== '' || $cliente !== '') {
-            $totalCount  = $countResult;
-            $calcPages   = (int)ceil($totalCount / 25);
-            $totalPages  = max(1, $calcPages);
-            $currentPage = max(1, min($requestedPage, $totalPages));
-
-            // Paginación limpia de los resultados filtrados (25 por página)
-            $offset = ($currentPage - 1) * 25;
-            $documentos = array_slice($documentos, $offset, 25);
-        } else {
-            $totalCount  = $totalItems;
-            $currentPage = (int) ($data['page'] ?? $requestedPage);
+        // Deduplicación limpia por Folio (evita duplicidad Guía DTE 52 + Factura DTE 33)
+        $uniqueDocs = [];
+        $seen = [];
+        $totalMontoBatch = 0;
+        foreach ($documentos as $doc) {
+            $key = trim((string)$doc['folio']);
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $uniqueDocs[] = $doc;
+                $totalMontoBatch += (float)$doc['total'];
+            }
         }
+        $documentos = $uniqueDocs;
+
+        // Ordenar por fecha descendente (lo más reciente de HOY 2026 arriba)
+        usort($documentos, function($a, $b) {
+            $fa = $a['fecha'] ?? '';
+            $fb = $b['fecha'] ?? '';
+            if ($fa === $fb) {
+                return (int)($b['folio'] ?? 0) - (int)($a['folio'] ?? 0);
+            }
+            return strcmp($fb, $fa);
+        });
+
+        $totalCount  = count($documentos);
+        $calcPages   = (int)ceil($totalCount / 25);
+        $totalPages  = max(1, $calcPages);
 
         return $this->response->setJSON([
             'success'     => true,
             'data'        => $documentos,
             'total_monto' => $totalMontoBatch,
             'pagination'  => [
-                'current_page' => $currentPage,
+                'current_page' => 1,
                 'total_pages'  => $totalPages,
                 'count'        => $totalCount
             ]
@@ -435,6 +517,13 @@ class FactoController extends BaseController
                   `updated_at` = CURRENT_TIMESTAMP";
 
         $db->query($sql, [$folio, $codigoSii, $estadoPago, $montoPagado, $obs]);
+
+        if ($estadoPago === 'pagada') {
+            $db->table('tbl_documentos_cobrar')->where('numero', $folio)->update([
+                'impago' => 0.00,
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        }
 
         return $this->response->setJSON([
             'success' => true,
@@ -477,6 +566,14 @@ class FactoController extends BaseController
                       `estado_pago` = VALUES(`estado_pago`),
                       `updated_at` = CURRENT_TIMESTAMP";
             $db->query($sql, [$folio, $codigoSii, $nuevoEstado]);
+
+            if ($nuevoEstado === 'pagada') {
+                $db->table('tbl_documentos_cobrar')->where('numero', $folio)->update([
+                    'impago' => 0.00,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+
             $updatedCount++;
         }
 
@@ -486,6 +583,109 @@ class FactoController extends BaseController
             'success' => true,
             'message' => "Se actualizaron {$updatedCount} documentos a '{$nuevoEstado}' correctamente.",
             'count' => $updatedCount
+        ]);
+    }
+
+    /**
+     * POST /cobranza/facto/importar-a-cobrar
+     * Traslada los DTEs seleccionados (Facturas 33, Boletas 39, Guías 52) directamente a tbl_documentos_cobrar.
+     */
+    public function importarACobrar(): ResponseInterface
+    {
+        $raw = $this->request->getBody();
+        $json = json_decode($raw, true) ?: $this->request->getPost();
+
+        $documentos = $json['documentos'] ?? [];
+
+        if (empty($documentos)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Debe seleccionar al menos un documento para trasladar a Cuentas por Cobrar.'
+            ]);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $importedCount = 0;
+        foreach ($documentos as $doc) {
+            $folioRaw = trim((string)($doc['folio'] ?? ''));
+            if (empty($folioRaw) || $folioRaw === 'N/A' || $folioRaw === '—') {
+                continue;
+            }
+
+            $folioClean = ltrim($folioRaw, '0');
+            $rutCliente = trim((string)($doc['cliente_rut'] ?? ''));
+            $nombreCliente = trim((string)($doc['cliente_nombre'] ?? 'Cliente Facto'));
+            $codigoSii = (int)($doc['codigo_sii'] ?? 33);
+            $fecha = trim((string)($doc['fecha'] ?? date('Y-m-d')));
+            $total = (float)($doc['total'] ?? 0);
+
+            $tipoNombre = $this->getTipoDteNombre($codigoSii);
+
+            // 1. Asegurar registro del cliente en tbl_clientes si no existe
+            if (!empty($rutCliente)) {
+                $existCliente = $db->table('tbl_clientes')->where('rut', $rutCliente)->get()->getRowArray();
+                if (!$existCliente) {
+                    $db->table('tbl_clientes')->insert([
+                        'nombre' => $nombreCliente,
+                        'rut' => $rutCliente,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                }
+            }
+
+            // 2. Insertar / Actualizar en tbl_documentos_cobrar
+            $existing = $db->table('tbl_documentos_cobrar')->where('numero', $folioClean)->get()->getRowArray();
+            if ($existing) {
+                $db->table('tbl_documentos_cobrar')->where('id', $existing['id'])->update([
+                    'rut_cliente'    => $rutCliente,
+                    'tipo_documento' => $tipoNombre,
+                    'fecha'          => $fecha,
+                    'total'          => $total,
+                    'impago'         => $total,
+                    'updated_at'     => date('Y-m-d H:i:s')
+                ]);
+            } else {
+                $db->table('tbl_documentos_cobrar')->insert([
+                    'rut_cliente'    => $rutCliente,
+                    'tipo_documento' => $tipoNombre,
+                    'numero'         => $folioClean,
+                    'fecha'          => $fecha,
+                    'total'          => $total,
+                    'pagado'         => 0.00,
+                    'impago'         => $total,
+                    'created_at'     => date('Y-m-d H:i:s'),
+                    'updated_at'     => date('Y-m-d H:i:s')
+                ]);
+            }
+
+            // 3. Registrar en tbl_facto_pagos en estado 'pendiente'
+            $sqlFacto = "INSERT INTO `tbl_facto_pagos` (`folio`, `codigo_sii`, `estado_pago`, `monto_pagado`, `observacion`)
+                         VALUES (?, ?, 'pendiente', 0.00, 'Cuentas por Cobrar (Deuda Impaga)')
+                         ON DUPLICATE KEY UPDATE 
+                           `estado_pago` = 'pendiente',
+                           `monto_pagado` = 0.00,
+                           `updated_at` = CURRENT_TIMESTAMP";
+            $db->query($sqlFacto, [$folioClean, $codigoSii]);
+
+            $importedCount++;
+        }
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Ocurrió un error al guardar los documentos en Cuentas por Cobrar.'
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Se trasladaron {$importedCount} documentos a Cuentas por Cobrar con éxito.",
+            'count' => $importedCount
         ]);
     }
 

@@ -64,6 +64,14 @@ $routes->patch('/cuentas-pagar/comentario-doc',    'BalanceDiario::actualizarCom
 $routes->get('/admin', 'AdminController::index');
 $routes->get('/admin/', 'AdminController::index');
 
+// ── Administración / Cuentas Bancarias / Efectivo
+$routes->get('/administracion/cuentas-bancarias',                  'CuentasBancariasController::index');
+$routes->get('/administracion/cuentas-bancarias/listar',           'CuentasBancariasController::listar');
+$routes->get('/administracion/cuentas-bancarias/obtener/(:num)',    'CuentasBancariasController::obtener/$1');
+$routes->post('/administracion/cuentas-bancarias/guardar',         'CuentasBancariasController::guardar');
+$routes->post('/administracion/cuentas-bancarias/eliminar',        'CuentasBancariasController::eliminar');
+$routes->post('/administracion/cuentas-bancarias/eliminar/(:num)',   'CuentasBancariasController::eliminar/$1');
+
 // ── Usuarios
 $routes->get('/usuarios',              'UsuariosController::index');
 $routes->get('/usuarios/lista',        'UsuariosController::lista');
@@ -95,12 +103,26 @@ $routes->get('/webhook-test/logs', 'WebhookReceiver::getLogs');
 $routes->delete('/webhook-test/logs', 'WebhookReceiver::clearLogs');
 $routes->post('/webhook/tupana', 'WebhookReceiver::receive');
 
-// ── Cobranza ──────────────────────────────────────────────────
+// ── Cobranza / Documentos Ventas (Facto API Ventas) ──────────────
 $routes->get('/cobranza/documentos-impago',          'WebhookReceiver::documentosImpago');
 $routes->get('/cobranza/facturas-facto',             'FactoController::facturasFacto');
 $routes->get('/cobranza/facto/buscar-dtes',           'FactoController::buscarDtes');
 $routes->post('/cobranza/facto/actualizar-estado-pago', 'FactoController::actualizarEstadoPago');
 $routes->post('/cobranza/facto/actualizar-estado-masivo', 'FactoController::actualizarEstadoMasivo');
+$routes->post('/cobranza/facto/importar-a-cobrar',     'FactoController::importarACobrar');
+
+// ── Cobranza / Manejo de Caja
+$routes->get('/cobranza/manejo-caja',          'ManejoCajaController::index');
+$routes->get('/cobranza/manejo-caja/listar',   'ManejoCajaController::listar');
+$routes->post('/cobranza/manejo-caja/guardar', 'ManejoCajaController::guardar');
+$routes->post('/cobranza/manejo-caja/ajustar-saldo', 'ManejoCajaController::ajustarSaldo');
+
+// ── Facturación / Documentos Proveedores (Facto API Compras) ───────
+$routes->get('/facturacion/importar/proveedores',            'FactoProveedorController::index');
+$routes->get('/facturacion/proveedores/buscar-dtes',          'FactoProveedorController::buscarDtes');
+$routes->post('/facturacion/proveedores/actualizar-estado-pago', 'FactoProveedorController::actualizarEstadoPago');
+$routes->post('/facturacion/proveedores/actualizar-estado-masivo', 'FactoProveedorController::actualizarEstadoMasivo');
+$routes->post('/facturacion/proveedores/importar-a-pagar',    'FactoProveedorController::importarAPagar');
 
 // ── Logística ──────────────────────────────────────────────────
 $routes->get('/hoja-de-ruta',          'LogisticaController::hojaDeRuta');

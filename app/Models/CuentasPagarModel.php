@@ -23,7 +23,7 @@ class CuentasPagarModel extends Model
             SELECT
                 dp.id,
                 dp.rut_proveedor,
-                COALESCE(p.razon_social, p.nombre, dp.rut_proveedor) AS nombre_proveedor,
+                COALESCE(p.nombre, p.razon_social, dp.rut_proveedor) AS nombre_proveedor,
                 dp.tipo_documento,
                 dp.numero,
                 dp.fecha,
@@ -32,7 +32,11 @@ class CuentasPagarModel extends Model
                 dp.impago,
                 dp.comentario
             FROM tbl_documentos_pagar dp
-            LEFT JOIN tbl_proveedores p ON p.rut = dp.rut_proveedor
+            LEFT JOIN tbl_proveedores p 
+               ON (
+                   p.rut = dp.rut_proveedor 
+                   OR REPLACE(REPLACE(REPLACE(p.rut, '.', ''), ' ', ''), '-', '') = REPLACE(REPLACE(REPLACE(dp.rut_proveedor, '.', ''), ' ', ''), '-', '')
+               )
             WHERE dp.impago > 0
             ORDER BY nombre_proveedor ASC, dp.fecha ASC
         ");
@@ -62,47 +66,72 @@ class CuentasPagarModel extends Model
         $this->db->transStart();
         try {
             foreach ($proveedores as $proveedor) {
-                $rut    = trim($proveedor['rut'] ?? '');
-                $nombre = trim($proveedor['emisor_receptor'] ?? $proveedor['nombre'] ?? '');
-                $docs   = $proveedor['docs'] ?? [];
+                $rutRaw   = trim($proveedor['rut'] ?? '');
+                $rutClean = str_replace(['.', ' ', '-'], '', strtoupper($rutRaw));
+                $nombre   = trim($proveedor['emisor_receptor'] ?? $proveedor['nombre'] ?? $proveedor['proveedor'] ?? '');
+                $docs     = $proveedor['docs'] ?? [];
 
-                if (empty($rut) || empty($docs)) continue;
+                if (empty($rutClean) || empty($docs)) continue;
 
-                // Crear proveedor si no existe
+                // Crear o actualizar proveedor si no existe por RUT limpio
                 $existeProv = $this->db->table('tbl_proveedores')
-                    ->where('rut', $rut)->countAllResults();
+                    ->where('rut', $rutRaw)
+                    ->orWhere('rut', $rutClean)
+                    ->orWhere("REPLACE(REPLACE(REPLACE(rut, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                    ->get()->getRowArray();
+
                 if (!$existeProv) {
                     $this->db->table('tbl_proveedores')->insert([
-                        'rut'          => $rut,
+                        'rut'          => $rutRaw ?: $rutClean,
                         'nombre'       => $nombre,
                         'razon_social' => $nombre,
                         'created_at'   => date('Y-m-d H:i:s'),
                     ]);
+                } else {
+                    if (!empty($nombre)) {
+                        $this->db->table('tbl_proveedores')
+                            ->where('id', $existeProv['id'])
+                            ->update([
+                                'nombre'       => $nombre,
+                                'razon_social' => $nombre,
+                            ]);
+                    }
                 }
 
                 // Eliminar abonos huerfanos de docs de este proveedor
                 $docsExistentes = $this->db->table('tbl_documentos_pagar')
-                    ->where('rut_proveedor', $rut)->get()->getResultArray();
+                    ->where('rut_proveedor', $rutRaw)
+                    ->orWhere('rut_proveedor', $rutClean)
+                    ->orWhere("REPLACE(REPLACE(REPLACE(rut_proveedor, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                    ->get()->getResultArray();
                 $idsExistentes = array_column($docsExistentes, 'id');
                 if (!empty($idsExistentes)) {
                     $this->db->table('tbl_abonos_pagar')
                         ->whereIn('doc_id', $idsExistentes)->delete();
                 }
 
-                // Eliminar documentos anteriores para re-insertar
+                // Eliminar documentos anteriores por RUT limpio para re-insertar de forma atómica y sin duplicados
                 $this->db->table('tbl_documentos_pagar')
-                    ->where('rut_proveedor', $rut)->delete();
+                    ->where('rut_proveedor', $rutRaw)
+                    ->orWhere('rut_proveedor', $rutClean)
+                    ->orWhere("REPLACE(REPLACE(REPLACE(rut_proveedor, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                    ->delete();
 
+                $seenNums = [];
                 foreach ($docs as $doc) {
+                    $numDoc = (string)($doc['numero'] ?? $doc['nro'] ?? '');
+                    if (empty($numDoc) || isset($seenNums[$numDoc])) continue;
+                    $seenNums[$numDoc] = true;
+
                     $total      = (float)($doc['total']  ?? 0);
                     $pagado     = (float)($doc['pagado'] ?? 0);
                     $impago     = isset($doc['impago']) ? (float)$doc['impago'] : max(0, $total - $pagado);
                     $comentario = trim($doc['comentario'] ?? '');
 
                     $this->db->table('tbl_documentos_pagar')->insert([
-                        'rut_proveedor'  => $rut,
+                        'rut_proveedor'  => $rutRaw ?: $rutClean,
                         'tipo_documento' => $doc['tipo_documento'] ?? $doc['tipo'] ?? 'Sin tipo',
-                        'numero'         => (string)($doc['numero'] ?? $doc['nro'] ?? ''),
+                        'numero'         => $numDoc,
                         'fecha'          => $this->parsearFecha($doc['fecha'] ?? ''),
                         'total'          => $total,
                         'pagado'         => $pagado,
@@ -129,13 +158,19 @@ class CuentasPagarModel extends Model
      */
     public function eliminarPorProveedor(string $rut): int
     {
+        $clean = str_replace(['.', ' '], '', $rut);
         $docs = $this->db->table('tbl_documentos_pagar')
-            ->where('rut_proveedor', $rut)->get()->getResultArray();
+            ->where('rut_proveedor', $rut)
+            ->orWhere("REPLACE(REPLACE(rut_proveedor, '.', ''), ' ', '') = '{$clean}'")
+            ->get()->getResultArray();
         $ids = array_column($docs, 'id');
         if (!empty($ids)) {
             $this->db->table('tbl_abonos_pagar')->whereIn('doc_id', $ids)->delete();
         }
-        $this->db->table('tbl_documentos_pagar')->where('rut_proveedor', $rut)->delete();
+        $this->db->table('tbl_documentos_pagar')
+            ->where('rut_proveedor', $rut)
+            ->orWhere("REPLACE(REPLACE(rut_proveedor, '.', ''), ' ', '') = '{$clean}'")
+            ->delete();
         return $this->db->affectedRows();
     }
 

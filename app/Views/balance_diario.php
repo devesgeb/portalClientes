@@ -103,10 +103,10 @@
 
         <div class="page-body">
 
-            <!-- â”€â”€ KPI Summary Strip â”€â”€ -->
-            <div class="row g-3 mb-3">
-                <div class="col-xl-3 col-md-6">
-                    <div class="kpi-card">
+            <!-- ── KPI Summary Strip ── -->
+            <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-5 g-3 mb-3">
+                <div class="col">
+                    <div class="kpi-card h-100">
                         <div class="kpi-icon" style="background:#eff6ff;"><i class="bi bi-arrow-down-circle-fill"
                                 style="color:#2563eb;"></i></div>
                         <div>
@@ -116,19 +116,30 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-3 col-md-6">
-                    <div class="kpi-card">
+                <div class="col">
+                    <div class="kpi-card h-100">
                         <div class="kpi-icon" style="background:#ecfeff;"><i class="bi bi-box-seam-fill"
                                 style="color:#0891b2;"></i></div>
                         <div>
                             <div class="kpi-val" id="kpiCaja" style="color:#0891b2;">$0</div>
                             <div class="kpi-lbl">Total Inventario</div>
-                            <div class="kpi-sub" id="kpiCajaSub">0 Ã­tems</div>
+                            <div class="kpi-sub" id="kpiCajaSub">0 ítems</div>
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-3 col-md-6">
-                    <div class="kpi-card">
+                <div class="col">
+                    <div class="kpi-card h-100">
+                        <div class="kpi-icon" style="background:#e0e7ff;"><i class="bi bi-safe-fill"
+                                style="color:#4338ca;"></i></div>
+                        <div>
+                            <div class="kpi-val" id="kpiCajasReal" style="color:#4338ca;">$0</div>
+                            <div class="kpi-lbl">Cajas</div>
+                            <div class="kpi-sub" id="kpiCajasRealSub">0 cajas</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="kpi-card h-100">
                         <div class="kpi-icon" style="background:#f5f3ff;"><i class="bi bi-arrow-up-circle-fill"
                                 style="color:#7c3aed;"></i></div>
                         <div>
@@ -138,19 +149,18 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-xl-3 col-md-6">
-                    <div class="kpi-card">
+                <div class="col">
+                    <div class="kpi-card h-100">
                         <div class="kpi-icon" style="background:#f0fdf4;"><i class="bi bi-wallet2"
                                 style="color:#16a34a;"></i></div>
                         <div>
                             <div class="kpi-val" id="kpiNeto" style="color:#16a34a;">$0</div>
-                            <div class="kpi-lbl">Total </div>
-                            <div class="kpi-sub" style="color:#8fa3bc;">(Cobrar + Caja - Pagar)</div>
+                            <div class="kpi-lbl">Total</div>
+                            <div class="kpi-sub" style="color:#8fa3bc;">(Cobrar + Inv + Cajas - Pagar)</div>
                         </div>
                     </div>
                 </div>
             </div>
-
             <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
              THREE-COLUMN BALANCE LAYOUT
          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
@@ -253,7 +263,7 @@
                                     <tr>
                                         <th>Descripción</th>
                                         <th class="text-end">Precio</th>
-                                        <th class="text-end">Stock disp.</th>
+                                        <th class="text-end">Stock</th>
                                         <th class="text-end">Stock res.</th>
                                         <th class="text-end">Total</th>
                                         <th class="text-center" style="width:80px;">Acciones</th>
@@ -739,9 +749,6 @@
                                                 style="padding:8px 12px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;">
                                                 Total</th>
                                             <th
-                                                style="padding:8px 12px;font-size:.68rem;color:#16a34a;font-weight:600;text-transform:uppercase;text-align:right;">
-                                                Pagado</th>
-                                            <th
                                                 style="padding:8px 12px;font-size:.68rem;color:#dc2626;font-weight:600;text-transform:uppercase;text-align:right;">
                                                 Impago</th>
                                         </tr>
@@ -960,8 +967,6 @@
                                     style="background:#ede9fe;color:#5b21b6;margin-right:4px;">Rut</span>
                                 <span class="badge"
                                     style="background:#ede9fe;color:#5b21b6;margin-right:4px;">Total</span>
-                                <span class="badge"
-                                    style="background:#ede9fe;color:#5b21b6;margin-right:4px;">Pagado</span>
                                 <span class="badge" style="background:#ede9fe;color:#5b21b6;">Impago</span>
 
                             </span>

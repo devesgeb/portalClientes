@@ -196,7 +196,7 @@ function renderCaja() {
     tbody.innerHTML = '';
     
     // Calcular el total completo del inventario basado en dbCajaFull (sin filtrar)
-    const totalInventarioFull = dbCajaFull.reduce((s, r) => s + (r.precio * Math.max(0, r.stock - r.stock_reservado)), 0);
+    const totalInventarioFull = dbCajaFull.reduce((s, r) => s + (r.precio * r.stock), 0);
 
     if (!dbCaja.length) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;font-size:.80rem;">
@@ -205,13 +205,12 @@ function renderCaja() {
         </td></tr>`;
     } else {
         dbCaja.forEach(r => {
-            const disponible = Math.max(0, r.stock - r.stock_reservado);
-            const monto = r.precio * disponible;
+            const monto = r.precio * r.stock;
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="font-size:.80rem;font-weight:600;color:#1a2940;">${r.nombre}</td>
                 <td class="text-end" style="font-size:.80rem;color:#0891b2;font-weight:600;">${PortalApp.fmt(r.precio)}</td>
-                <td class="text-end" style="font-size:.80rem;font-weight:600;">${disponible}</td>
+                <td class="text-end" style="font-size:.80rem;font-weight:600;">${r.stock}</td>
                 <td class="text-end" style="font-size:.80rem;font-weight:600;color:#4f46e5;">${r.stock_reservado}</td>
                 <td class="text-end amt-caja" style="font-size:.80rem;font-weight:700;">${PortalApp.fmt(monto)}</td>
                 <td class="text-center">
@@ -349,14 +348,40 @@ async function guardarEdicionProducto() {
     }
 }
 
+let totalCajasReal = 0;
+let cantidadCajasReal = 0;
+
+async function cargarCajasManejo() {
+    try {
+        const url = window.BD_BASE_URL.replace('index.php', '') + 'cobranza/manejo-caja/listar';
+        const resp = await fetch(url);
+        const json = await resp.json();
+        if (json.success && json.resumen) {
+            totalCajasReal = parseFloat(json.resumen.total_saldo || 0);
+            const cajasActivas = (json.cajas || []).filter(c => c.estado === 'activa');
+            cantidadCajasReal = cajasActivas.length;
+
+            const elVal = document.getElementById('kpiCajasReal');
+            if (elVal) elVal.textContent = PortalApp.fmt(totalCajasReal);
+
+            const elSub = document.getElementById('kpiCajasRealSub');
+            if (elSub) elSub.textContent = `${cantidadCajasReal} caja${cantidadCajasReal !== 1 ? 's' : ''}`;
+
+            recalcNeto();
+        }
+    } catch (e) {
+        console.error('Error al cargar saldo total de cajas:', e);
+    }
+}
+
 // ════════════════════════════════════════════════════════════════════════
 //  KPI NETO
 // ════════════════════════════════════════════════════════════════════════
 function recalcNeto() {
-    const cobrar = dbCobrar.reduce((s, r) => s + (r.monto || 0), 0);
-    const caja   = dbCajaFull.reduce((s, r) => s + (r.precio * Math.max(0, r.stock - r.stock_reservado)), 0);
-    const pagar  = dbPagar.reduce((s, r) => s + (r.monto || 0), 0);
-    const neto   = cobrar + caja - pagar;
+    const cobrar     = dbCobrar.reduce((s, r) => s + (r.monto || 0), 0);
+    const inventario = dbCajaFull.reduce((s, r) => s + (r.precio * r.stock), 0);
+    const pagar      = dbPagar.reduce((s, r) => s + (r.monto || 0), 0);
+    const neto       = cobrar + inventario + totalCajasReal - pagar;
     const el = document.getElementById('kpiNeto');
     if (el) { el.textContent = PortalApp.fmt(neto); el.style.color = neto >= 0 ? '#16a34a' : '#dc2626'; }
 }
@@ -943,4 +968,5 @@ async function cargarReservasResumenEditModal(sku) {
 }
 DocumentosModule.cargarDesdeBD(CFG_COBRAR);
 DocumentosModule.cargarDesdeBD(CFG_PAGAR);
+cargarCajasManejo();
 

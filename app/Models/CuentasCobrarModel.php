@@ -49,9 +49,13 @@ class CuentasCobrarModel extends Model
             SELECT d.*,
                 COALESCE(c.nombre, c.razon_social, d.rut_cliente) AS nombre_cliente
             FROM `tbl_documentos_cobrar` d
-            LEFT JOIN `tbl_clientes` c ON c.rut = d.rut_cliente
+            LEFT JOIN `tbl_clientes` c 
+               ON (
+                   c.rut COLLATE utf8mb4_unicode_ci = d.rut_cliente COLLATE utf8mb4_unicode_ci 
+                   OR REPLACE(REPLACE(REPLACE(c.rut, '.', ''), ' ', ''), '-', '') COLLATE utf8mb4_unicode_ci = REPLACE(REPLACE(REPLACE(d.rut_cliente, '.', ''), ' ', ''), '-', '') COLLATE utf8mb4_unicode_ci
+               )
             WHERE d.impago > 0
-        ORDER BY COALESCE(c.nombre, c.razon_social, d.rut_cliente) ASC, d.fecha DESC
+            ORDER BY COALESCE(c.nombre, c.razon_social, d.rut_cliente) ASC, d.fecha DESC
         ");
         return $query ? $query->getResultArray() : [];
     }
@@ -64,12 +68,19 @@ class CuentasCobrarModel extends Model
 
     public function contarPorCliente(string $rut): int
     {
-        return (int)$this->where('rut_cliente', $rut)->countAllResults();
+        $clean = str_replace(['.', ' ', '-'], '', $rut);
+        return (int)$this->where('rut_cliente', $rut)
+            ->orWhere("REPLACE(REPLACE(REPLACE(rut_cliente, '.', ''), ' ', ''), '-', '') = '{$clean}'")
+            ->countAllResults();
     }
 
     public function eliminarPorCliente(string $rut): int
     {
-        $this->where('rut_cliente', $rut)->delete();
+        $clean = str_replace(['.', ' ', '-'], '', $rut);
+        $this->db->table('tbl_documentos_cobrar')
+            ->where('rut_cliente', $rut)
+            ->orWhere("REPLACE(REPLACE(REPLACE(rut_cliente, '.', ''), ' ', ''), '-', '') = '{$clean}'")
+            ->delete();
         return $this->db->affectedRows();
     }
 
@@ -103,27 +114,41 @@ class CuentasCobrarModel extends Model
         $clientesSincronizados = 0;
 
         foreach ($clientesActuales as $cliente) {
-            $rut    = trim($cliente['rut_cliente'] ?? '');
-            $nombre = trim($cliente['nombre_cliente'] ?? $rut);
+            $rutRaw = trim($cliente['rut_cliente'] ?? $cliente['rut'] ?? '');
+            $rutClean = str_replace(['.', ' ', '-'], '', strtoupper($rutRaw));
+            $nombre = trim($cliente['nombre_cliente'] ?? $cliente['nombre'] ?? $rutClean);
             $docs   = $cliente['docs'] ?? [];
 
-            if (empty($rut) || empty($docs)) continue;
+            if (empty($rutClean) || empty($docs)) continue;
 
             // ── Auto-crear o actualizar cliente en tbl_clientes ──
-            $existe = $db->table('tbl_clientes')->where('rut', $rut)->countAllResults();
+            $existe = $db->table('tbl_clientes')
+                ->where('rut', $rutRaw)
+                ->orWhere('rut', $rutClean)
+                ->orWhere("REPLACE(REPLACE(REPLACE(rut, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                ->get()->getRowArray();
+
             if (!$existe) {
                 $db->table('tbl_clientes')->insert([
-                    'rut'    => $rut,
-                    'nombre' => $nombre ?: $rut,
+                    'rut'    => $rutRaw ?: $rutClean,
+                    'nombre' => $nombre ?: $rutClean,
                 ]);
             } else {
-                $db->table('tbl_clientes')->where('rut', $rut)->update([
-                    'nombre' => $nombre ?: $rut,
-                ]);
+                if (!empty($nombre)) {
+                    $db->table('tbl_clientes')
+                        ->where('id', $existe['id'])
+                        ->update([
+                            'nombre' => $nombre ?: $rutClean,
+                        ]);
+                }
             }
 
-            // Reemplazar documentos del cliente
-            $db->table($this->table)->where('rut_cliente', $rut)->delete();
+            // Reemplazar documentos del cliente por RUT limpio
+            $db->table($this->table)
+                ->where('rut_cliente', $rutRaw)
+                ->orWhere('rut_cliente', $rutClean)
+                ->orWhere("REPLACE(REPLACE(REPLACE(rut_cliente, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                ->delete();
 
             $filas = [];
             foreach ($docs as $doc) {
@@ -159,7 +184,7 @@ class CuentasCobrarModel extends Model
                 }
 
                 $filas[] = [
-                    'rut_cliente'    => trim(substr($rut, 0, 20)),
+                    'rut_cliente'    => trim(substr($rutClean, 0, 20)),
                     'tipo_documento' => trim(substr($tipoDoc, 0, 120)),
                     'fecha'          => $fechaValida,
                     'numero'         => trim(substr($numDoc, 0, 50)),
