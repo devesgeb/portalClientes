@@ -31,6 +31,38 @@ function sbOpenClass(array $g, string $active): string
 <!-- Overlay móvil -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="cerrarSidebar()"></div>
 
+<style>
+.sidebar {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+.sidebar-logo {
+    flex-shrink: 0 !important;
+}
+.sidebar-nav {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.25) transparent;
+}
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.2);
+    border-radius: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-foot {
+    flex-shrink: 0 !important;
+}
+</style>
+
 <div class="sidebar" id="mainSidebar">
     <div class="sidebar-logo">
         <img src="<?= base_url('public/assets/img/logo_empresa.png') ?>"

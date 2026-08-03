@@ -32,6 +32,8 @@ body {
 ══════════════════════════════════════════════════════════════════ */
 .sidebar {
     width: var(--sidebar-w);
+    height: 100vh;
+    max-height: 100vh;
     min-height: 100vh;
     background: var(--sidebar-bg);
     display: flex;
@@ -53,7 +55,8 @@ body {
 
 /* ── Nav scrollable ─────────────────────────────────────────────── */
 .sidebar-nav {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 10px 12px;
     overflow-y: auto;
     scrollbar-width: thin;
