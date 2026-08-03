@@ -33,10 +33,16 @@ function sbOpenClass(array $g, string $active): string
 
 <style>
 .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
     height: 100vh !important;
     max-height: 100vh !important;
     display: flex !important;
     flex-direction: column !important;
+    overflow: hidden !important;
+    z-index: 1000 !important;
 }
 .sidebar-logo {
     flex-shrink: 0 !important;
@@ -44,19 +50,22 @@ function sbOpenClass(array $g, string $active): string
 .sidebar-nav {
     flex: 1 1 auto !important;
     min-height: 0 !important;
+    max-height: calc(100vh - 120px) !important;
     overflow-y: auto !important;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,.25) transparent;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255, 255, 255, 0.35) rgba(0, 0, 0, 0.15) !important;
 }
 .sidebar-nav::-webkit-scrollbar {
-    width: 6px;
+    width: 7px !important;
 }
 .sidebar-nav::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,.2);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.35) !important;
+    border-radius: 4px !important;
 }
 .sidebar-nav::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(0, 0, 0, 0.15) !important;
 }
 .sidebar-foot {
     flex-shrink: 0 !important;
