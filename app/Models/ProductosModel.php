@@ -118,13 +118,59 @@ class ProductosModel extends Model
                 $existe = $db->table('tbl_productos')->where('sku', $sku)->countAllResults();
 
                 if ($existe) {
-                    unset($nr['sku']); // no actualizar PK
-                    $db->table('tbl_productos')->where('sku', $sku)->update($nr);
+                    $upd = $nr;
+                    unset($upd['sku']); // no actualizar PK
+                    $db->table('tbl_productos')->where('sku', $sku)->update($upd);
                     $actualizados++;
                 } else {
                     $nr['sku'] = $sku;
                     $db->table('tbl_productos')->insert($nr);
                     $insertados++;
+                }
+
+                // Sincronizar también en tbl_facto_productos para respaldar la vista principal y Balance Diario si la API no responde
+                if ($db->tableExists('tbl_facto_productos')) {
+                    $factoSql = "INSERT INTO tbl_facto_productos 
+                        (facto_product_id, sku, nombre, descripcion, marca, modelo, unidad_medida, stock, stock_reservado, costo_neto, costo_total, facto_lista_id, nombre_lista, precio_neto, precio_impuesto, precio_total)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'Precios base', ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                          nombre = VALUES(nombre),
+                          descripcion = VALUES(descripcion),
+                          marca = VALUES(marca),
+                          modelo = VALUES(modelo),
+                          unidad_medida = VALUES(unidad_medida),
+                          stock = VALUES(stock),
+                          stock_reservado = VALUES(stock_reservado),
+                          costo_neto = VALUES(costo_neto),
+                          costo_total = VALUES(costo_total),
+                          precio_neto = VALUES(precio_neto),
+                          precio_impuesto = VALUES(precio_impuesto),
+                          precio_total = VALUES(precio_total),
+                          updated_at = CURRENT_TIMESTAMP";
+                    
+                    $factoId    = abs(crc32($sku)) % 80000000 + 1000;
+                    $costoNeto  = $nr['costo_neto'] ?? 0;
+                    $costoTotal = round($costoNeto * 1.19, 2);
+                    $precioNeto = $nr['precio_venta_neto'] ?? 0;
+                    $precioTotal= $nr['precio_venta_total'] ?? round($precioNeto * 1.19, 2);
+                    $precioImp  = $nr['monto_iva'] ?? round($precioNeto * 0.19, 2);
+
+                    $db->query($factoSql, [
+                        $factoId,
+                        $sku,
+                        $nr['nombre'] ?? $sku,
+                        $nr['descripcion'] ?? '',
+                        $nr['marca'] ?? '',
+                        $nr['modelo'] ?? '',
+                        $nr['unidad'] ?? 'UN',
+                        $nr['stock_bodega_ppral'] ?? 0,
+                        $nr['stock_reservado'] ?? 0,
+                        $costoNeto,
+                        $costoTotal,
+                        $precioNeto,
+                        $precioImp,
+                        $precioTotal
+                    ]);
                 }
             } catch (\Exception $e) {
                 $errores[] = "Fila " . ($i + 2) . " (SKU=$sku): " . $e->getMessage();

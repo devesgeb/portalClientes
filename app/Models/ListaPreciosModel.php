@@ -126,6 +126,57 @@ class ListaPreciosModel extends Model
                     $db->table('tbl_listaPrecios')->insert($nr);
                     $insertados++;
                 }
+
+                // Sincronizar también en tbl_facto_productos y tbl_facto_listas_precios
+                if ($db->tableExists('tbl_facto_productos')) {
+                    $mapListasId = [
+                        'precios base' => 1, 'base' => 1,
+                        'horeca' => 11,
+                        'mayorista' => 12,
+                        'distribucion detallista' => 13, 'distribución detallista' => 13,
+                        'distribucion mayorista' => 14, 'distribución mayorista' => 14,
+                    ];
+
+                    $listaLower = strtolower($lista);
+                    $factoListaId = $mapListasId[$listaLower] ?? (abs(crc32($listaLower)) % 90 + 20);
+
+                    if ($db->tableExists('tbl_facto_listas_precios')) {
+                        $db->query("INSERT INTO tbl_facto_listas_precios (facto_lista_id, nombre) VALUES (?, ?) ON DUPLICATE KEY UPDATE nombre = VALUES(nombre)", [$factoListaId, $lista]);
+                    }
+
+                    $baseProd = $db->table('tbl_productos')->where('sku', $sku)->get()->getRowArray();
+                    $factoProd = $db->table('tbl_facto_productos')->where('sku', $sku)->get()->getRowArray();
+
+                    $factoId = $factoProd['facto_product_id'] ?? (abs(crc32($sku)) % 80000000 + 1000);
+                    $nombre  = $factoProd['nombre'] ?? $baseProd['nombre'] ?? $sku;
+                    $desc    = $factoProd['descripcion'] ?? $baseProd['descripcion'] ?? '';
+                    $marca   = $factoProd['marca'] ?? $baseProd['marca'] ?? '';
+                    $modelo  = $factoProd['modelo'] ?? $baseProd['modelo'] ?? '';
+                    $unidad  = $factoProd['unidad_medida'] ?? $baseProd['unidad'] ?? 'UN';
+                    $stock   = $factoProd['stock'] ?? $baseProd['stock_bodega_ppral'] ?? 0;
+                    $reser   = $factoProd['stock_reservado'] ?? $baseProd['stock_reservado'] ?? 0;
+                    $cNeto   = $factoProd['costo_neto'] ?? $baseProd['costo_neto'] ?? 0;
+                    $cTotal  = round($cNeto * 1.19, 2);
+
+                    $pNeto   = $nr['precio_neto'] ?? 0;
+                    $pTotal  = $nr['precio_total'] ?? round($pNeto * 1.19, 2);
+                    $pImp    = $nr['monto_iva'] ?? round($pNeto * 0.19, 2);
+
+                    $sqlFactoLP = "INSERT INTO tbl_facto_productos
+                        (facto_product_id, sku, nombre, descripcion, marca, modelo, unidad_medida, stock, stock_reservado, costo_neto, costo_total, facto_lista_id, nombre_lista, precio_neto, precio_impuesto, precio_total)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                          nombre = VALUES(nombre),
+                          nombre_lista = VALUES(nombre_lista),
+                          precio_neto = VALUES(precio_neto),
+                          precio_impuesto = VALUES(precio_impuesto),
+                          precio_total = VALUES(precio_total),
+                          updated_at = CURRENT_TIMESTAMP";
+
+                    $db->query($sqlFactoLP, [
+                        $factoId, $sku, $nombre, $desc, $marca, $modelo, $unidad, $stock, $reser, $cNeto, $cTotal, $factoListaId, $lista, $pNeto, $pImp, $pTotal
+                    ]);
+                }
             } catch (\Exception $e) {
                 $errores[] = "Fila " . ($i + 2) . " ($sku / $lista): " . $e->getMessage();
             }
