@@ -233,9 +233,8 @@
                     </div>
                     <div class="col-12 col-md-4">
                         <select id="selectLista" class="form-select" onchange="cargarProductos()">
-                            <option value="">-- Todas las Listas de Precios --</option>
                             <?php foreach ($listas as $l): ?>
-                                <option value="<?= $l['facto_lista_id'] ?>"><?= esc($l['nombre']) ?></option>
+                                <option value="<?= $l['facto_lista_id'] ?>" <?= ((int)$l['facto_lista_id'] === 1) ? 'selected' : '' ?>><?= esc($l['nombre']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -853,7 +852,7 @@
 
         function resetFiltros() {
             document.getElementById('inputSearch').value = '';
-            document.getElementById('selectLista').value = '';
+            document.getElementById('selectLista').value = '1';
             cargarProductos();
         }
 
@@ -887,7 +886,7 @@
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando...';
 
             try {
-                const url = `${baseUrl}bodega/facto-productos/listar?q=&lista_id=`;
+                const url = `${baseUrl}bodega/facto-productos/listar?q=&lista_id=all`;
                 const resp = await fetch(url);
                 const json = await resp.json();
 

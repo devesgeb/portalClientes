@@ -531,7 +531,6 @@ class BodegaController extends BaseController
         $listas = [];
         if ($db->tableExists('tbl_facto_listas_precios')) {
             $listas = $db->table('tbl_facto_listas_precios')
-                         ->orderBy('nombre', 'ASC')
                          ->get()->getResultArray();
         }
 
@@ -541,8 +540,7 @@ class BodegaController extends BaseController
                 "SELECT DISTINCT facto_lista_id, 
                         COALESCE(NULLIF(nombre_lista, ''), CONCAT('Lista #', facto_lista_id)) AS nombre 
                  FROM tbl_facto_productos 
-                 WHERE facto_lista_id IS NOT NULL AND facto_lista_id > 0
-                 ORDER BY facto_lista_id ASC"
+                 WHERE facto_lista_id IS NOT NULL AND facto_lista_id > 0"
             )->getResultArray();
 
             foreach ($listasRaw as $lr) {
@@ -552,6 +550,14 @@ class BodegaController extends BaseController
                 ];
             }
         }
+
+        // Orden específico deseado: 1: Precios base, 11: Horeca, 12: Mayorista, 13: Distribución detallista, 14: Distribución Mayorista
+        $ordenDeseado = [1 => 1, 11 => 2, 12 => 3, 13 => 4, 14 => 5];
+        usort($listas, function($a, $b) use ($ordenDeseado) {
+            $posA = $ordenDeseado[(int)$a['facto_lista_id']] ?? 99;
+            $posB = $ordenDeseado[(int)$b['facto_lista_id']] ?? 99;
+            return $posA <=> $posB;
+        });
 
         return view('bodega/facto_productos', [
             'title'      => 'Productos Facto API – Bodega',
@@ -892,8 +898,13 @@ td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
 
         $builder = $db->table('tbl_facto_productos');
 
-        if (!empty($listaId) && is_numeric($listaId)) {
+        if ($listaId === 'all' || $listaId === 'todas') {
+            // No filtrar por facto_lista_id para exportaciones completas
+        } elseif (!empty($listaId) && is_numeric($listaId)) {
             $builder->where('facto_lista_id', (int)$listaId);
+        } else {
+            // Por defecto si viene vacío o no especificado: Precios base (facto_lista_id = 1)
+            $builder->where('facto_lista_id', 1);
         }
 
         if (!empty($q)) {
