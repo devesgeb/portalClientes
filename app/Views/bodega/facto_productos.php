@@ -178,9 +178,9 @@
                 </button>
                 <div>
                     <div class="topbar-title">
-                        <i class="bi bi-box-seam me-2" style="color:var(--accent);"></i>Productos Facto API
+                        <i class="bi bi-box-seam me-2" style="color:var(--accent);"></i>Productos
                     </div>
-                    <div class="topbar-sub">Portal Admin &rsaquo; Bodega &rsaquo; Productos Facto API</div>
+                    <div class="topbar-sub">Portal Admin &rsaquo; Bodega &rsaquo; Productos</div>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -200,7 +200,7 @@
             <!-- Page Header Box -->
             <div class="page-header-box d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
-                    <h4 class="mb-1 fw-bold text-white"><i class="bi bi-box-seam me-2"></i>Productos Facto API</h4>
+                    <h4 class="mb-1 fw-bold text-white"><i class="bi bi-box-seam me-2"></i>Productos</h4>
                     <p class="mb-0 text-slate-300 fs-7">Listado completo de productos sincronizados desde Facto API con exactamente las mismas columnas y asignación de stock reservado.</p>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
