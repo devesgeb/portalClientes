@@ -107,7 +107,7 @@ class FactoProveedorController extends BaseController
         }
 
         // 3. Consultar API de Facto (Received = Proveedores)
-        $url = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($queryParams);
+        $url = 'https://api.facto.cl/v1/documents?' . http_build_query($queryParams);
         $ch  = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -143,7 +143,7 @@ class FactoProveedorController extends BaseController
             $mh = curl_multi_init();
             $curlHandles = [];
             foreach ($itemsToFetch as $idx => $docId) {
-                $chHandle = curl_init("https://api-billing.koywe.com/V1/documents/{$docId}");
+                $chHandle = curl_init("https://api.facto.cl/v1/documents/{$docId}");
                 curl_setopt($chHandle, CURLOPT_RETURNTRANSFER, true);
                 curl_setopt($chHandle, CURLOPT_TIMEOUT, 5);
                 curl_setopt($chHandle, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
@@ -166,7 +166,8 @@ class FactoProveedorController extends BaseController
                 if (!empty($issuerRut) && !empty($issuerName) && $issuerName !== 'N/A' && $issuerName !== 'FE ALIMENTOS SPA') {
                     $proveedoresCache[$issuerRut] = $issuerName;
                     if ($db->tableExists('tbl_proveedores')) {
-                        $existP = $db->table('tbl_proveedores')->where('rut', $issuerRut)->get()->getRowArray();
+                        $qP = $db->table('tbl_proveedores')->where('rut', $issuerRut)->get();
+                        $existP = ($qP && is_object($qP)) ? $qP->getRowArray() : null;
                         if (!$existP) {
                             $db->table('tbl_proveedores')->insert([
                                 'nombre'     => $issuerName,
@@ -320,7 +321,9 @@ class FactoProveedorController extends BaseController
             }
 
             $folioClean      = ltrim($folioRaw, '0');
+            if (empty($folioClean)) $folioClean = '0';
             $rutProveedor    = trim((string)($doc['proveedor_rut'] ?? $doc['cliente_rut'] ?? ''));
+            $rutClean        = str_replace(['.', ' ', '-'], '', strtoupper($rutProveedor));
             $nombreProveedor = trim((string)($doc['proveedor_nombre'] ?? $doc['cliente_nombre'] ?? 'Proveedor Facto'));
             $codigoSii       = (int)($doc['codigo_sii'] ?? 33);
             $fecha           = trim((string)($doc['fecha'] ?? date('Y-m-d')));
@@ -329,8 +332,13 @@ class FactoProveedorController extends BaseController
             $tipoNombre = $this->getTipoDteNombre($codigoSii);
 
             // 1. Asegurar registro del proveedor en tbl_proveedores si no existe
-            if (!empty($rutProveedor)) {
-                $existProv = $db->table('tbl_proveedores')->where('rut', $rutProveedor)->get()->getRowArray();
+            if (!empty($rutProveedor) && $db->tableExists('tbl_proveedores')) {
+                $qProv = $db->table('tbl_proveedores')
+                    ->where('rut', $rutProveedor)
+                    ->orWhere('rut', $rutClean)
+                    ->orWhere("REPLACE(REPLACE(REPLACE(rut, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                    ->get();
+                $existProv = ($qProv && is_object($qProv)) ? $qProv->getRowArray() : null;
                 if (!$existProv) {
                     $db->table('tbl_proveedores')->insert([
                         'nombre'     => $nombreProveedor,
@@ -341,15 +349,33 @@ class FactoProveedorController extends BaseController
                 }
             }
 
-            // 2. Insertar / Actualizar en tbl_documentos_pagar
-            $existing = $db->table('tbl_documentos_pagar')->where('numero', $folioClean)->get()->getRowArray();
+            // 2. Insertar / Actualizar en tbl_documentos_pagar filtrando por folio y RUT normalizado
+            $builder = $db->table('tbl_documentos_pagar')
+                ->groupStart()
+                    ->where('numero', $folioRaw)
+                    ->orWhere('numero', $folioClean)
+                    ->orWhere("TRIM(LEADING '0' FROM TRIM(numero)) = '{$folioClean}'")
+                ->groupEnd();
+
+            if (!empty($rutClean)) {
+                $builder->groupStart()
+                    ->where('rut_proveedor', $rutProveedor)
+                    ->orWhere('rut_proveedor', $rutClean)
+                    ->orWhere("REPLACE(REPLACE(REPLACE(rut_proveedor, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                ->groupEnd();
+            }
+
+            $qExisting = $builder->get();
+            $existing  = ($qExisting && is_object($qExisting)) ? $qExisting->getRowArray() : null;
+
             if ($existing) {
                 $db->table('tbl_documentos_pagar')->where('id', $existing['id'])->update([
-                    'rut_proveedor'  => $rutProveedor,
+                    'rut_proveedor'  => $rutProveedor ?: $existing['rut_proveedor'],
                     'tipo_documento' => $tipoNombre,
+                    'numero'         => $folioClean,
                     'fecha'          => $fecha,
                     'total'          => $total,
-                    'impago'         => $total,
+                    'impago'         => max(0, $total - (float)$existing['pagado']),
                     'comentario'     => 'Importado desde Facto API Compras',
                     'updated_at'     => date('Y-m-d H:i:s')
                 ]);
@@ -510,7 +536,7 @@ class FactoProveedorController extends BaseController
         $username     = env('FACTO_USERNAME') ?: '77775829-2/5634';
         $password     = env('FACTO_PASSWORD') ?: '1de8af70e35aa7e0d2c7b6d4750cad25';
 
-        $authUrl  = "https://api-billing.koywe.com/V1/auth";
+        $authUrl  = "https://api.facto.cl/auth";
         $authBody = [
             "grant_type"    => "password",
             "client_id"     => $clientId,

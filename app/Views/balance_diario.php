@@ -227,13 +227,13 @@
                 </div>
 
                 <!-- ┌────────────────────────────────────────────────┐
-                 │  COL 2 – CAJA / INVENTARIO                │
+                 │  COL 2 – INVENTARIO                        │
                  └────────────────────────────────────────────────┘ -->
                 <div class="col-xl-4 col-lg-12">
                     <div class="panel">
                         <!-- Header -->
                         <div class="panel-head" style="background:var(--caja-head);">
-                            <div class="ph-title"><i class="bi bi-box-seam-fill"></i>Caja / Inventario</div>
+                            <div class="ph-title"><i class="bi bi-box-seam-fill"></i>Inventario</div>
                             <div class="d-flex gap-1">
                                 <button class="btn btn-sm"
                                     style="background:rgba(255,255,255,.18);color:#fff;border-radius:7px;font-size:.72rem;"
@@ -319,12 +319,10 @@
                                 oninput="filtrarPagar(this.value)"
                                 style="font-size:.76rem;border-color:#e2e8f0;border-radius:8px;">
                         </div>
-                    </div><!-- /panel-head Pagar -->
 
-                    <!-- Body Panel Pagar -->
-                    <div class="panel-body">
-                        <div class="table-wrap">
-                            <table class="tbl table table-borderless">
+                        <!-- Table -->
+                        <div class="panel-body">
+                            <table class="tbl table table-borderless" id="tblPagar">
                                 <thead>
                                     <tr>
                                         <th style="width:28px;">#</th>
@@ -335,7 +333,7 @@
                                 </thead>
                                 <tbody id="bodyPagar">
                                     <tr>
-                                        <td colspan="3"
+                                        <td colspan="4"
                                             style="text-align:center;padding:20px;color:#94a3b8;font-size:.80rem;">
                                             <span class="spinner-border spinner-border-sm me-2"></span>Cargando datos...
                                         </td>
@@ -343,12 +341,14 @@
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- Total -->
                         <div class="panel-total">
                             <span class="total-label"><i class="bi bi-sigma me-1"></i>Total Impago</span>
-                            <span class="total-value amt-pagar" id="totalPagar"></span>
+                            <span class="total-value amt-pagar" id="totalPagar">$0</span>
                         </div>
-                    </div><!-- /panel-body Pagar -->
-                </div><!-- /panel Pagar -->
+                    </div>
+                </div>
             </div><!-- /col Pagar -->
 
         </div><!-- /row -->
@@ -598,16 +598,78 @@
 
     <!-- MODAL - Detalle Cobrar -->
     <div class="modal fade" id="modalDetalle" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width:960px;">
             <div class="modal-content" style="border-radius:14px;">
                 <div class="modal-header py-3" id="detalleHeader" style="background:var(--cobrar-head);">
                     <h6 class="modal-title text-white" id="detalleTitulo">Detalle - Cuentas por Cobrar</h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
                 </div>
                 <div class="modal-body p-4" id="detalleBody"></div>
-                <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
+                <div class="modal-footer justify-content-between" style="border-top:1px solid #f0f4f9;">
                     <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;"
                         data-bs-dismiss="modal">Cerrar</button>
+                    <button class="btn btn-sm btn-success px-3 fw-bold" id="btnAplicarEstadoDetalle" style="display:none;border-radius:8px;" onclick="DocumentosModule.aplicarCambiosEstadoDetalle(window._CFG_COBRAR)">
+                        <i class="bi bi-check2-all me-1"></i> Aplicar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         MODAL – Registrar Abono Cuentas por Pagar
+    ═══════════════════════════════════════════ -->
+    <div class="modal fade" id="modalAbonoPagar" tabindex="-1" style="z-index: 1065;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+                <div class="modal-header py-3" style="background:linear-gradient(135deg,#d97706,#b45309);">
+                    <h6 class="modal-title text-white fw-bold" id="modalAbonoPagarTitulo">
+                        <i class="bi bi-cash-coin me-2"></i>Registrar Abono a Documento
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" id="abonoDocId">
+                    <div class="p-3 mb-3 rounded-3" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;">
+                        <div class="d-flex justify-content-between mb-1" style="font-size:0.8rem;">
+                            <span class="text-slate-600">Documento Folio:</span>
+                            <span class="fw-bold text-slate-800" id="abonoFolioText">#--</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1" style="font-size:0.8rem;">
+                            <span class="text-slate-600">Saldo Impago Actual:</span>
+                            <span class="fw-bold text-amber-700 fs-6" id="abonoImpagoText">$0</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-slate-700" style="font-size:.80rem;">Monto a Abonar ($)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-muted">$</span>
+                            <input type="number" class="form-control fw-bold fs-6 text-success" id="abonoMontoInput" placeholder="Ej: 4000000" min="1" step="1">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-slate-700" style="font-size:.80rem;">Fecha del Abono</label>
+                        <input type="date" class="form-control form-control-sm" id="abonoFechaInput" value="<?= date('Y-m-d') ?>">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-slate-700" style="font-size:.80rem;">Comentario / Referencia</label>
+                        <input type="text" class="form-control form-control-sm" id="abonoComentarioInput" placeholder="Ej: Transferencia Banco Chile - Pago parcial">
+                    </div>
+
+                    <!-- Lista de abonos anteriores -->
+                    <div class="mt-3 pt-3 border-top" id="abonosHistorialContainer" style="display:none;">
+                        <label class="fw-bold text-slate-700 mb-2" style="font-size:.78rem;"><i class="bi bi-clock-history me-1 text-warning"></i>Historial de Abonos Realizados</label>
+                        <div style="max-height: 140px; overflow-y: auto; font-size: .78rem;" id="abonosHistorialLista"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light justify-content-between">
+                    <button type="button" class="btn btn-sm btn-light px-3 py-2 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-sm btn-warning px-4 py-2 fw-bold text-dark shadow-sm" id="btnGuardarAbono" onclick="DocumentosModule.guardarAbonoPagar()">
+                        <i class="bi bi-check2-circle me-1"></i> Registrar Abono
+                    </button>
                 </div>
             </div>
         </div>
@@ -922,7 +984,7 @@
          MODAL â€” Detalle Pagar
     â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
     <div class="modal fade" id="modalDetallePagar" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width:960px;">
             <div class="modal-content" style="border-radius:14px;">
                 <div class="modal-header py-3" id="detalleHeaderPagar" style="background:var(--pagar-head);">
                     <h6 class="modal-title text-white" id="detalleTituloPagar">Detalle - Cuentas por Pagar</h6>
@@ -1169,11 +1231,11 @@
     </script>
     <!-- JS en orden: Core -> Modulo Generico -> Entry Point -->
     <script
-        src="<?= base_url('public/assets/js/app/PortalApp.js') . '?v=' . filemtime(FCPATH . 'public/assets/js/app/PortalApp.js') ?>"></script>
+        src="<?= base_url('public/assets/js/app/PortalApp.js') . '?v=' . time() ?>"></script>
     <script
-        src="<?= base_url('public/assets/js/app/DocumentosModule.js') . '?v=' . filemtime(FCPATH . 'public/assets/js/app/DocumentosModule.js') ?>"></script>
+        src="<?= base_url('public/assets/js/app/DocumentosModule.js') . '?v=' . time() ?>"></script>
     <script
-        src="<?= base_url('public/assets/js/BalanceDiario.js') . '?v=' . filemtime(FCPATH . 'public/assets/js/BalanceDiario.js') ?>"></script>
+        src="<?= base_url('public/assets/js/BalanceDiario.js') . '?v=' . time() ?>"></script>
     <script>
         /* ── Autocomplete: funciones globales ────────────────────────────────────── */
         window._acTimer = null;
@@ -1363,6 +1425,7 @@
     <style>
         .autocomplete-item:hover { background: #f1f5f9; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 
 </html>

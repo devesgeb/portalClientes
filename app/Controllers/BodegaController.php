@@ -62,22 +62,67 @@ class BodegaController extends BaseController
         return $this->response->setJSON(['success' => true, 'productos' => $productos]);
     }
 
-    // ── GET /bodega/producto/{sku} — Detalle completo (JSON) ───────
+    // ── GET /bodega/producto/{sku} — Obtener detalle de un producto ─
     public function getProducto(string $sku): ResponseInterface
     {
         $db  = \Config\Database::connect();
         $row = $db->table('tbl_productos')->where('sku', $sku)->get()->getRowArray();
+
+        if (!$row && $db->tableExists('tbl_facto_productos')) {
+            $fRow = $db->table('tbl_facto_productos')->where('sku', $sku)->get()->getRowArray();
+            if ($fRow) {
+                $row = [
+                    'id' => $fRow['id'],
+                    'sku' => $fRow['sku'],
+                    'nombre' => $fRow['nombre'],
+                    'categoria' => 'Facto API',
+                    'marca' => $fRow['marca'],
+                    'modelo' => $fRow['modelo'],
+                    'unidad' => $fRow['unidad_medida'],
+                    'codigo_barras' => null,
+                    'tipo' => 'Producto',
+                    'costo_neto' => $fRow['costo_neto'],
+                    'precio_venta_neto' => $fRow['precio_neto'],
+                    'monto_iva' => $fRow['precio_impuesto'],
+                    'precio_venta_total' => $fRow['precio_total'],
+                    'stock_bodega_ppral' => $fRow['stock'],
+                    'stock_reservado' => $fRow['stock_reservado'],
+                    'stock_bodega_sec' => 0,
+                    'stock_minimo' => 0,
+                    'comision_vendedor' => null,
+                    'descripcion' => $fRow['descripcion']
+                ];
+            }
+        }
 
         if (!$row) {
             return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Producto no encontrado.']);
         }
 
         // Listas de precio asociadas
-        $listas = $db->table('tbl_listaPrecios')
-                     ->where('sku', $sku)
-                     ->where('activo', 1)
-                     ->orderBy('lista', 'ASC')
-                     ->get()->getResultArray();
+        $listas = [];
+        if ($db->tableExists('tbl_listaPrecios')) {
+            $listas = $db->table('tbl_listaPrecios')
+                         ->where('sku', $sku)
+                         ->where('activo', 1)
+                         ->orderBy('lista', 'ASC')
+                         ->get()->getResultArray();
+        }
+
+        if (empty($listas) && $db->tableExists('tbl_facto_productos')) {
+            $fListas = $db->table('tbl_facto_productos')
+                          ->where('sku', $sku)
+                          ->get()->getResultArray();
+            foreach ($fListas as $fl) {
+                $listas[] = [
+                    'sku' => $fl['sku'],
+                    'lista' => $fl['nombre_lista'],
+                    'precio_neto' => $fl['precio_neto'],
+                    'precio_total' => $fl['precio_total'],
+                    'activo' => 1
+                ];
+            }
+        }
 
         return $this->response->setJSON(['success' => true, 'producto' => $row, 'listas' => $listas]);
     }
@@ -88,8 +133,10 @@ class BodegaController extends BaseController
         $body = $this->request->getJSON(true);
         $db   = \Config\Database::connect();
 
-        $existe = $db->table('tbl_productos')->where('sku', $sku)->countAllResults();
-        if (!$existe) {
+        $existeProd = $db->table('tbl_productos')->where('sku', $sku)->countAllResults();
+        $existeFacto = $db->tableExists('tbl_facto_productos') ? $db->table('tbl_facto_productos')->where('sku', $sku)->countAllResults() : 0;
+
+        if (!$existeProd && !$existeFacto) {
             return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Producto no encontrado.']);
         }
 
@@ -99,16 +146,33 @@ class BodegaController extends BaseController
         if (isset($body['stock_reservado']))                                  $datos['stock_reservado'] = (float) $body['stock_reservado'];
         if (isset($body['costo_neto']))                                       $datos['costo_neto'] = (float) $body['costo_neto'];
 
-        if (empty($datos) && !isset($body['precio_venta_neto'])) {
-            return $this->response->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Nada que actualizar.']);
-        }
-
-        if (!empty($datos)) {
+        if ($existeProd && !empty($datos)) {
             $db->table('tbl_productos')->where('sku', $sku)->update($datos);
         }
 
+        if ($existeFacto) {
+            $datosFacto = [];
+            if (isset($body['nombre']) && trim($body['nombre']) !== '') $datosFacto['nombre'] = trim($body['nombre']);
+            if (isset($body['stock_bodega_ppral']))                      $datosFacto['stock'] = (float) $body['stock_bodega_ppral'];
+            if (isset($body['stock_reservado']))                         $datosFacto['stock_reservado'] = (float) $body['stock_reservado'];
+            if (isset($body['costo_neto'])) {
+                $costoNeto = (float)$body['costo_neto'];
+                $datosFacto['costo_neto'] = $costoNeto;
+                $datosFacto['costo_total'] = round($costoNeto * 1.19, 2);
+            }
+            if (isset($body['precio_venta_neto'])) {
+                $precioNeto = (float)$body['precio_venta_neto'];
+                $datosFacto['precio_neto'] = $precioNeto;
+                $datosFacto['precio_impuesto'] = round($precioNeto * 0.19, 2);
+                $datosFacto['precio_total'] = $precioNeto + $datosFacto['precio_impuesto'];
+            }
+            if (!empty($datosFacto)) {
+                $db->table('tbl_facto_productos')->where('sku', $sku)->update($datosFacto);
+            }
+        }
+
         // Actualizar o insertar lista de precio 'Precios base'
-        if (isset($body['precio_venta_neto'])) {
+        if (isset($body['precio_venta_neto']) && $existeProd) {
             $precioNeto = (float) $body['precio_venta_neto'];
             $precioTotal = round($precioNeto * 1.19, 0);
 
@@ -452,6 +516,398 @@ class BodegaController extends BaseController
             'success' => true,
             'message' => 'Reserva eliminada correctamente.',
             'stock_reservado' => $total
+        ]);
+    }
+
+    // ── Vista: Prototipo Productos Facto API ────────────────────────
+    public function factoProductos()
+    {
+        $session    = session();
+        $userId     = $session->get('is_logued_in');
+        $loginModel = new LoginModel();
+        $usuario    = $userId ? $loginModel->obtenerPorId($userId) : null;
+
+        $db = \Config\Database::connect();
+        $listas = [];
+        if ($db->tableExists('tbl_facto_listas_precios')) {
+            $listas = $db->table('tbl_facto_listas_precios')
+                         ->orderBy('nombre', 'DESC')
+                         ->get()->getResultArray();
+        }
+
+        return view('bodega/facto_productos', [
+            'title'      => 'Productos Facto API – Bodega',
+            'base_url'   => base_url(),
+            'assets_url' => base_url('public/assets/'),
+            'activePage' => 'facto_productos',
+            'usuario'    => $usuario,
+            'listas'     => $listas,
+        ]);
+    }
+
+    // ── GET /bodega/facto-productos/exportar-pdf — Catálogo HTML imprimible ──
+    public function exportarCatalogoPdf()
+    {
+        $db = \Config\Database::connect();
+
+        if (!$db->tableExists('tbl_facto_productos')) {
+            return $this->response->setBody('<p>No hay productos sincronizados.</p>');
+        }
+
+        // ── Listas permitidas (nombre_bd => [etiqueta, color cabecera]) ──
+        $listasConfig = [
+            'Precios base'            => ['label' => 'PRECIO BASE',    'color' => '#16a34a'],
+            'Lista #1'                => ['label' => 'PRECIO BASE',    'color' => '#16a34a'],
+            'Horeca'                  => ['label' => 'HORECA',         'color' => '#0369a1'],
+            'Mayorista'               => ['label' => 'MAYORISTA',      'color' => '#7c3aed'],
+            'Distribucion detallista' => ['label' => 'DIST. DETALLE',  'color' => '#b45309'],
+            'Distribucion Mayorista'  => ['label' => 'DIST. MAYOR',    'color' => '#be123c'],
+        ];
+
+        // Filtrar solo las que existen en BD, usando los nombres corregidos
+        $listasEnBD = $db->query(
+            "SELECT DISTINCT COALESCE(l.nombre, p.nombre_lista) AS nombre_lista 
+             FROM tbl_facto_productos p
+             LEFT JOIN tbl_facto_listas_precios l ON p.facto_lista_id = l.facto_lista_id
+             WHERE COALESCE(l.nombre, p.nombre_lista) IS NOT NULL"
+        )->getResultArray();
+        $listasEnBDSet = array_flip(array_column($listasEnBD, 'nombre_lista'));
+
+        $nombresListas   = [];
+        $etiquetasUsadas = [];
+        foreach ($listasConfig as $nombreBD => $cfg) {
+            if (isset($listasEnBDSet[$nombreBD]) && !in_array($cfg['label'], $etiquetasUsadas, true)) {
+                $nombresListas[$nombreBD] = $cfg;
+                $etiquetasUsadas[]        = $cfg['label'];
+            }
+        }
+
+        // ── Un SKU por fila con GROUP BY ──
+        $skusRaw = $db->query(
+            "SELECT sku,
+                    MIN(nombre)        AS nombre,
+                    MIN(descripcion)   AS descripcion,
+                    MIN(unidad_medida) AS unidad_medida,
+                    MIN(marca)         AS marca,
+                    MIN(modelo)        AS modelo
+               FROM tbl_facto_productos
+              GROUP BY sku
+              ORDER BY sku ASC"
+        )->getResultArray();
+
+        // ── Precios por SKU y lista ──
+        $preciosPorSku = [];
+        $queryPrecios = "SELECT p.sku, COALESCE(l.nombre, p.nombre_lista) AS nombre_lista, p.precio_neto, p.precio_total 
+                         FROM tbl_facto_productos p
+                         LEFT JOIN tbl_facto_listas_precios l ON p.facto_lista_id = l.facto_lista_id";
+        foreach ($db->query($queryPrecios)->getResultArray() as $pr) {
+            $preciosPorSku[$pr['sku']][$pr['nombre_lista']] = [
+                'neto'  => $pr['precio_neto'],
+                'total' => $pr['precio_total'],
+            ];
+        }
+
+        // ── Categorías derivadas del prefijo del SKU ──
+        $mapaCategoria = [
+            'PROCE' => 'Preelaborados',
+            'CONG'  => 'Congelados',
+            'ACE'   => 'Aderezos y Aceites',
+            'COC'   => 'Cocidos',
+            'MP'    => 'Materias Primas',
+            'ACC'   => 'Accesorios',
+        ];
+        $porCategoria = [];
+        foreach ($skusRaw as $p) {
+            // Excepción solicitada: no mostrar MP-001
+            if (strtoupper(trim($p['sku'])) === 'MP-001') {
+                continue;
+            }
+            $prefijo = strtoupper(preg_replace('/[-_\d].*/', '', $p['sku']));
+            $cat = 'Otros';
+            foreach ($mapaCategoria as $key => $nombre) {
+                if (str_starts_with($prefijo, $key)) { $cat = $nombre; break; }
+            }
+            $porCategoria[$cat][] = $p;
+        }
+        krsort($porCategoria); // Orden inverso (Z-A)
+
+        $totalSkus   = count($skusRaw);
+        $totalCats   = count($porCategoria);
+        $totalListas = count($nombresListas);
+        $fechaGen    = date('d/m/Y H:i');
+        $empresa     = 'F Alimentos SpA';
+
+        ob_start(); ?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Catálogo y Lista de Precios por SKU</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;}
+body{font-family:'Inter',Arial,sans-serif;font-size:8.5pt;color:#111;background:#fff;padding:12mm 10mm;}
+
+/* ── Acción print ── */
+/* Ocultar barra de depuración de CodeIgniter 4 */
+#debug-icon, #debug-bar, #toolbarContainer { display: none !important; }
+
+.no-print{position:fixed;top:14px;right:14px;z-index:9999;display:flex;gap:8px;}
+.btn-pdf{background:#dc2626;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:9.5pt;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(220,38,38,.3);}
+.btn-close{background:#475569;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:9.5pt;font-weight:600;cursor:pointer;}
+@media print{
+  .no-print{display:none!important;}
+  body{padding:0;}
+  @page{size:A4 landscape; margin: 0;}
+  table { page-break-inside: auto; break-inside: auto; margin-bottom: 20px; }
+  .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  thead { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+  tr { page-break-inside: avoid; break-inside: avoid; }
+}
+
+/* ── Top bar ── */
+.top-bar{display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #16a34a;padding-bottom:6px;margin-bottom:10px;}
+.top-bar .breadcrumb{font-size:7pt;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.top-bar .company{font-size:7.5pt;color:#374151;font-weight:700;text-transform:uppercase;}
+
+/* ── Encabezado principal ── */
+.main-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.main-header h1{font-size:22pt;font-weight:900;color:#0f172a;text-transform:uppercase;letter-spacing:-0.5px;line-height:1.05;}
+.main-header .subtitle{font-size:8pt;color:#64748b;margin-top:4px;font-weight:400;}
+.logo-box{display:inline-flex;align-items:center;height:45px;}
+.logo-box img{max-height:100%;object-fit:contain;}
+
+/* ── Stats cards ── */
+.stats-row{display:flex;gap:8px;margin-bottom:14px;}
+.stat-card{flex:1;border:1.5px solid #e2e8f0;border-radius:10px;padding:9px 14px;}
+.stat-card.green{border-color:#bbf7d0;background:#f0fdf4;}
+.stat-card.blue{border-color:#bfdbfe;background:#eff6ff;}
+.stat-card.purple{border-color:#ddd6fe;background:#f5f3ff;}
+.stat-card.gold{border-color:#fde68a;background:#fffbeb;}
+.stat-card .slabel{font-size:6.5pt;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
+.stat-card .svalue{font-size:14pt;font-weight:800;color:#0f172a;}
+.stat-card.green .svalue{color:#16a34a;}
+.stat-card.blue .svalue{color:#0369a1;}
+.stat-card.purple .svalue{color:#7c3aed;}
+.stat-card.gold .svalue{color:#b45309;}
+
+/* ── Categoría header integrado ── */
+.cat-header-cell{background:#008e4d !important;color:#fff !important;padding:8px 14px !important;font-size:8.5pt;font-weight:800;text-transform:uppercase;letter-spacing:.6px;border:none !important;text-align:left;}
+.cat-count{font-size:7.5pt;font-weight:500;opacity:.8;float:right;}
+
+/* ── Tabla ── */
+table{width:100%;border-collapse:collapse;margin-bottom:24px;}
+.col-header-row th{padding:8px 9px;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border:none;background:#0f172a !important;color:#fff !important;vertical-align:middle;text-align:center;}
+th.th-sku{text-align:left;width:75px;}
+th.th-desc{text-align:left;}
+
+/* Spacer rows para print margin 0 (superior e inferior) */
+tr.print-spacer { height: 10mm; background: #fff !important; border: none !important; }
+tr.print-spacer td { border: none !important; padding: 0 !important; background: #fff !important; }
+
+/* Subheader neto/total */
+.th-sub{font-weight:400;font-size:6.5pt;opacity:.85;display:block;margin-top:2px;}
+
+/* Filas */
+tbody tr:nth-child(odd) td{background:#fff;}
+tbody tr:nth-child(even) td{background:#f8fafc;}
+tbody tr:hover td{background:#f0fdf4;}
+tbody td{padding:7px 9px;font-size:8pt;color:#1e293b;border:1px solid #e2e8f0;vertical-align:middle;}
+
+td.td-sku{font-weight:800;color:#111827;font-size:8pt;white-space:nowrap;text-align:left;}
+td.td-desc .prod-name{font-weight:700;font-size:8.5pt;color:#0f172a;}
+td.td-desc .prod-model{font-size:7pt;color:#64748b;margin-top:1px;font-style:italic;}
+td.td-precio{text-align:right;}
+td.td-precio .p-total{font-weight:800;font-size:9.5pt;color:#111827;}
+td.td-precio .p-neto{font-size:7pt;color:#64748b;margin-top:1px;}
+td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
+
+/* ── Pie ── */
+.footer{margin-top:14px;padding-top:8px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:6.5pt;color:#94a3b8;}
+</style>
+</head>
+<body>
+
+<!-- Wrapper principal con padding para simular margenes de @page -->
+<div style="padding: 12mm 10mm;">
+
+<div class="no-print">
+  <button class="btn-pdf" onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+  <button class="btn-close" onclick="window.close()">✕ Cerrar</button>
+</div>
+
+<!-- Top bar -->
+<div class="top-bar">
+  <span class="breadcrumb">Catálogo de Productos y Lista de Precios por SKU</span>
+  <span class="company">Prelisto / <?= esc($empresa) ?></span>
+</div>
+
+<!-- Encabezado -->
+<div class="main-header">
+  <div>
+    <h1>Catálogo y Lista de Precios por SKU</h1>
+    <p class="subtitle">Portafolio Institucional y Matriz de Precios Diferenciados | <?= esc($empresa) ?></p>
+  </div>
+  <div class="logo-box">
+    <img src="<?= base_url('public/assets/img/logo_empresa.png') ?>" alt="Logo">
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card green">
+    <div class="slabel">Total Productos</div>
+    <div class="svalue"><?= $totalSkus ?> SKUs</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="slabel">Categorías</div>
+    <div class="svalue"><?= $totalCats ?> Líneas</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="slabel">Listas de Precios</div>
+    <div class="svalue"><?= $totalListas ?> Listas</div>
+  </div>
+  <div class="stat-card gold">
+    <div class="slabel">Moneda &amp; Impuestos</div>
+    <div class="svalue">CLP (Neto / Total)</div>
+  </div>
+</div>
+
+  <?php $cIdx = 0; foreach ($porCategoria as $categoria => $productos): ?>
+  <?php $numProds = count($productos); ?>
+  <table class="<?= $numProds <= 12 ? 'avoid-break' : '' ?>">
+    <thead>
+      <!-- Spacer invisible superior para cuando la tabla salta de página o inicia -->
+      <tr class="print-spacer"><th colspan="<?= 3 + count($nombresListas) ?>" style="border:none !important; background:#fff !important; padding:0 !important;"></th></tr>
+      <!-- Fila de Categoría integrada en el thead -->
+      <tr>
+        <th colspan="<?= 3 + count($nombresListas) ?>" class="cat-header-cell">
+          CATEGORÍA: <?= esc(strtoupper($categoria)) ?> 
+          <span class="cat-count">(<?= count($productos) ?> Productos)</span>
+        </th>
+      </tr>
+      <!-- Fila de Cabeceras de Columnas -->
+      <tr class="col-header-row">
+        <th class="th-sku">SKU</th>
+        <th class="th-desc">Descripción del Producto</th>
+        <?php foreach ($nombresListas as $nombreBD => $cfg): ?>
+        <th>
+          <?= esc($cfg['label']) ?>
+          <span class="th-sub">(Neto / Total)</span>
+        </th>
+        <?php endforeach; ?>
+      </tr>
+    </thead>
+    <tbody>
+      <?php foreach ($productos as $p): ?>
+      <tr>
+        <td class="td-sku"><?= esc($p['sku']) ?></td>
+        <td class="td-desc">
+          <div class="prod-name"><?= esc($p['nombre']) ?></div>
+          <?php if (!empty($p['modelo'])): ?>
+          <div class="prod-model">Modelo: <?= esc($p['modelo']) ?></div>
+          <?php elseif (!empty($p['descripcion'])): ?>
+          <div class="prod-model"><?= esc(mb_substr($p['descripcion'], 0, 60)) ?></div>
+          <?php endif; ?>
+        </td>
+        
+        <?php foreach ($nombresListas as $nombreBD => $cfg):
+          $pr = $preciosPorSku[$p['sku']][$nombreBD] ?? null;
+          if (!$pr && $nombreBD === 'Precios base') {
+              $pr = $preciosPorSku[$p['sku']]['Lista #1'] ?? null;
+          }
+          if (!$pr && $nombreBD === 'Lista #1') {
+              $pr = $preciosPorSku[$p['sku']]['Precios base'] ?? null;
+          }
+        ?>
+        <?php if ($pr && ((float)$pr['total'] > 0 || (float)$pr['neto'] > 0)): ?>
+        <td class="td-precio">
+          <div class="p-total">$<?= number_format((float)$pr['total'], 0, ',', '.') ?></div>
+          <div class="p-neto">N: $<?= number_format((float)$pr['neto'], 0, ',', '.') ?></div>
+        </td>
+        <?php else: ?>
+        <td class="td-precio no-precio">—</td>
+        <?php endif; ?>
+        <?php endforeach; ?>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+    <tfoot>
+      <!-- Spacer invisible inferior -->
+      <tr class="print-spacer"><td colspan="<?= 3 + count($nombresListas) ?>"></td></tr>
+    </tfoot>
+  </table>
+  <?php $cIdx++; endforeach; ?>
+
+<div class="footer">
+  <span>Documento generado el <?= $fechaGen ?> · Precios sujetos a modificación sin previo aviso</span>
+  <span><?= esc($empresa) ?></span>
+</div>
+
+</div> <!-- end wrapper -->
+
+</body>
+</html>
+<?php
+        $html = ob_get_clean();
+        return $this->response
+            ->setHeader('Content-Type', 'text/html; charset=utf-8')
+            ->setBody($html);
+    }
+
+
+    // ── GET /bodega/facto-productos/listar (API JSON) ──────────────
+    public function listarFactoProductos(): ResponseInterface
+    {
+        $db = \Config\Database::connect();
+
+        if (!$db->tableExists('tbl_facto_productos')) {
+            return $this->response->setJSON([
+                'success' => true,
+                'data' => [],
+                'stats' => ['total_skus' => 0, 'total_listas' => 0, 'stock_total' => 0, 'promedio_neto' => 0]
+            ]);
+        }
+
+        $listaId = $this->request->getGet('lista_id');
+        $q       = trim((string)$this->request->getGet('q'));
+
+        $builder = $db->table('tbl_facto_productos');
+
+        if (!empty($listaId) && is_numeric($listaId)) {
+            $builder->where('facto_lista_id', (int)$listaId);
+        }
+
+        if (!empty($q)) {
+            $builder->groupStart()
+                    ->like('sku', $q)
+                    ->orLike('nombre', $q)
+                    ->orLike('descripcion', $q)
+                    ->orLike('marca', $q)
+                    ->groupEnd();
+        }
+
+        $productos = $builder->orderBy('nombre', 'ASC')
+                             ->orderBy('nombre_lista', 'ASC')
+                             ->get()->getResultArray();
+
+        // Calcular Estadísticas
+        $statsRaw = $db->query("SELECT 
+            COUNT(DISTINCT sku) as total_skus,
+            COUNT(DISTINCT facto_lista_id) as total_listas,
+            SUM(DISTINCT stock) as stock_total,
+            AVG(precio_neto) as promedio_neto
+            FROM tbl_facto_productos")->getRowArray();
+
+        return $this->response->setJSON([
+            'success' => true,
+            'data'    => $productos,
+            'stats'   => [
+                'total_skus'    => (int)($statsRaw['total_skus'] ?? 0),
+                'total_listas'  => (int)($statsRaw['total_listas'] ?? 0),
+                'stock_total'   => (float)($statsRaw['stock_total'] ?? 0),
+                'promedio_neto' => (float)($statsRaw['promedio_neto'] ?? 0),
+            ]
         ]);
     }
 }

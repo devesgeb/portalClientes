@@ -505,7 +505,7 @@ function maximizarPanel(tipo) {
         contentHtml = renderMaxizadoPagar();
     } else if (tipo === 'caja') {
         color = 'var(--caja-head)';
-        tituloTxt = '<i class="bi bi-box-seam-fill me-2"></i>Caja / Inventario (Maximizado)';
+        tituloTxt = '<i class="bi bi-box-seam-fill me-2"></i>Inventario (Maximizado)';
         contentHtml = renderMaxizadoCaja();
     }
     
@@ -550,9 +550,9 @@ function renderMaxizadoCobrar() {
                     <td class="text-end" style="font-weight:700; color:var(--cobrar-head); padding:12px; vertical-align:middle;">${PortalApp.fmt(r.monto || 0)}</td>
                     <td class="text-center" style="padding:12px; vertical-align:middle;">
                         <div class="d-flex gap-1 justify-content-center">
-                            <button class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:.75rem;" title="Ver detalle" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.verDetalle(window._CFG_COBRAR, ${r.id}), 300);"><i class="bi bi-eye"></i> Detalle</button>
-                            <button class="btn btn-sm btn-outline-warning py-1 px-2" style="font-size:.75rem;" title="Editar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule._abrirEditarWrap('cobrar', ${r.id}), 300);"><i class="bi bi-pencil"></i></button>
-                            <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:.75rem;" title="Eliminar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.eliminar(window._CFG_COBRAR, ${r.id}), 300);"><i class="bi bi-trash3"></i></button>
+                            <button class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:.75rem;" title="Ver detalle" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.verDetalle(window._CFG_COBRAR, '${r.id}'), 300);"><i class="bi bi-eye"></i> Detalle</button>
+                            <button class="btn btn-sm btn-outline-warning py-1 px-2" style="font-size:.75rem;" title="Editar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule._abrirEditarWrap('cobrar', '${r.id}'), 300);"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:.75rem;" title="Eliminar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.eliminar(window._CFG_COBRAR, '${r.id}'), 300);"><i class="bi bi-trash3"></i></button>
                         </div>
                     </td>
                 </tr>
@@ -592,9 +592,9 @@ function renderMaxizadoPagar() {
                     <td class="text-end" style="font-weight:700; color:var(--pagar-head); padding:12px; vertical-align:middle;">${PortalApp.fmt(r.monto || 0)}</td>
                     <td class="text-center" style="padding:12px; vertical-align:middle;">
                         <div class="d-flex gap-1 justify-content-center">
-                            <button class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:.75rem;" title="Ver detalle" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.verDetalle(window._CFG_PAGAR, ${r.id}), 300);"><i class="bi bi-eye"></i> Detalle</button>
-                            <button class="btn btn-sm btn-outline-warning py-1 px-2" style="font-size:.75rem;" title="Editar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule._abrirEditarWrap('pagar', ${r.id}), 300);"><i class="bi bi-pencil"></i></button>
-                            <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:.75rem;" title="Eliminar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.eliminar(window._CFG_PAGAR, ${r.id}), 300);"><i class="bi bi-trash3"></i></button>
+                            <button class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:.75rem;" title="Ver detalle" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.verDetalle(window._CFG_PAGAR, '${r.id}'), 300);"><i class="bi bi-eye"></i> Detalle</button>
+                            <button class="btn btn-sm btn-outline-warning py-1 px-2" style="font-size:.75rem;" title="Editar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule._abrirEditarWrap('pagar', '${r.id}'), 300);"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:.75rem;" title="Eliminar" onclick="cerrarModalMaximizado(); setTimeout(() => DocumentosModule.eliminar(window._CFG_PAGAR, '${r.id}'), 300);"><i class="bi bi-trash3"></i></button>
                         </div>
                     </td>
                 </tr>

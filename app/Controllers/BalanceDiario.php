@@ -371,20 +371,36 @@ class BalanceDiario extends BaseController
     public function verificarDocumentoPagar(): ResponseInterface
     {
         $numero = trim($this->request->getGet('numero') ?? '');
+        $rut    = trim($this->request->getGet('rut') ?? '');
 
         if (empty($numero) || $numero === 'N/A') {
             return $this->response->setJSON(['existe' => false, 'count' => 0]);
         }
 
+        $numeroClean = ltrim($numero, '0');
+        if (empty($numeroClean)) $numeroClean = '0';
+        $rutClean    = str_replace(['.', ' ', '-'], '', strtoupper($rut));
+
         $db = \Config\Database::connect();
-        $query = $db->query(
-            "SELECT COUNT(*) AS total, GROUP_CONCAT(DISTINCT COALESCE(p.razon_social, p.nombre, d.rut_proveedor) ORDER BY 1 SEPARATOR ', ') AS proveedores
-             FROM tbl_documentos_pagar d
-             LEFT JOIN tbl_proveedores p ON p.rut = d.rut_proveedor
-             WHERE d.numero = ?",
-            [$numero]
-        );
-        $row = $query ? $query->getRowArray() : ['total' => 0, 'proveedores' => ''];
+        $builder = $db->table('tbl_documentos_pagar d')
+            ->select('COUNT(*) AS total, GROUP_CONCAT(DISTINCT COALESCE(p.razon_social, p.nombre, d.rut_proveedor) ORDER BY 1 SEPARATOR ", ") AS proveedores')
+            ->join('tbl_proveedores p', 'p.rut = d.rut_proveedor OR REPLACE(REPLACE(REPLACE(p.rut, ".", ""), " ", ""), "-", "") = REPLACE(REPLACE(REPLACE(d.rut_proveedor, ".", ""), " ", ""), "-", "")', 'left')
+            ->groupStart()
+                ->where('d.numero', $numero)
+                ->orWhere('d.numero', $numeroClean)
+                ->orWhere("TRIM(LEADING '0' FROM TRIM(d.numero)) = '{$numeroClean}'")
+            ->groupEnd();
+
+        if (!empty($rutClean)) {
+            $builder->groupStart()
+                ->where('d.rut_proveedor', $rut)
+                ->orWhere('d.rut_proveedor', $rutClean)
+                ->orWhere("REPLACE(REPLACE(REPLACE(d.rut_proveedor, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+            ->groupEnd();
+        }
+
+        $res = $builder->get();
+        $row = ($res && is_object($res)) ? $res->getRowArray() : null;
         $count = (int) ($row['total'] ?? 0);
 
         return $this->response->setJSON([
@@ -396,27 +412,51 @@ class BalanceDiario extends BaseController
 
     /**
      * GET /inventario/productos
-     * Devuelve todos los productos activos con precio_con_iva = costo_neto * 1.19
+     * Devuelve todos los productos desde tbl_facto_productos (o fallback a tbl_productos)
      */
     public function inventarioProductos(): ResponseInterface
     {
         $db = \Config\Database::connect();
-        $rows = $db->query("
-            SELECT
-                p.sku,
-                p.nombre,
-                p.categoria,
-                p.marca,
-                p.costo_neto,
-                ROUND(p.costo_neto * 1.19, 0)          AS precio_con_iva,
-                ROUND(p.costo_neto * 0.19, 0)           AS monto_iva,
-                p.stock_bodega_ppral                    AS stock,
-                p.stock_reservado,
-                ROUND(p.costo_neto * 1.19 * p.stock_bodega_ppral, 0) AS total
-            FROM tbl_productos p
-            WHERE p.activo = 1 AND p.stock_bodega_ppral > 0
-            ORDER BY p.nombre ASC
-        ")->getResultArray();
+        
+        $rows = [];
+        if ($db->tableExists('tbl_facto_productos')) {
+            $rows = $db->query("
+                SELECT
+                    f.sku,
+                    f.nombre,
+                    'Facto API'                                           AS categoria,
+                    f.marca,
+                    f.costo_neto,
+                    ROUND(f.costo_neto * 1.19, 0)                         AS precio_con_iva,
+                    ROUND(f.costo_neto * 0.19, 0)                         AS monto_iva,
+                    f.stock                                               AS stock,
+                    f.stock_reservado,
+                    ROUND(f.costo_neto * 1.19 * f.stock, 0)               AS total
+                FROM tbl_facto_productos f
+                WHERE f.stock > 0
+                GROUP BY f.sku
+                ORDER BY f.nombre ASC
+            ")->getResultArray();
+        }
+
+        if (empty($rows) && $db->tableExists('tbl_productos')) {
+            $rows = $db->query("
+                SELECT
+                    p.sku,
+                    p.nombre,
+                    p.categoria,
+                    p.marca,
+                    p.costo_neto,
+                    ROUND(p.costo_neto * 1.19, 0)          AS precio_con_iva,
+                    ROUND(p.costo_neto * 0.19, 0)           AS monto_iva,
+                    p.stock_bodega_ppral                    AS stock,
+                    p.stock_reservado,
+                    ROUND(p.costo_neto * 1.19 * p.stock_bodega_ppral, 0) AS total
+                FROM tbl_productos p
+                WHERE p.activo = 1 AND p.stock_bodega_ppral > 0
+                ORDER BY p.nombre ASC
+            ")->getResultArray();
+        }
 
         return $this->response->setJSON(['success' => true, 'data' => $rows]);
     }
@@ -537,8 +577,8 @@ class BalanceDiario extends BaseController
             $abonos  = $model->obtenerAbonos($docId);
 
             // Calcular nuevo pagado/impago para retornar al frontend
-            $doc = \Config\Database::connect()
-                ->table('tbl_documentos_pagar')->where('id', $docId)->get()->getRowArray();
+            $qDoc = \Config\Database::connect()->table('tbl_documentos_pagar')->where('id', $docId)->get();
+            $doc  = ($qDoc && is_object($qDoc)) ? $qDoc->getRowArray() : null;
 
             return $this->response->setStatusCode(201)->setJSON([
                 'success'    => true,
@@ -563,8 +603,8 @@ class BalanceDiario extends BaseController
             $model = new \App\Models\CuentasPagarModel();
 
             // Obtener doc_id antes de eliminar para devolver saldos actualizados
-            $abono = \Config\Database::connect()
-                ->table('tbl_abonos_pagar')->where('id', $abonoId)->get()->getRowArray();
+            $qAbono = \Config\Database::connect()->table('tbl_abonos_pagar')->where('id', $abonoId)->get();
+            $abono  = ($qAbono && is_object($qAbono)) ? $qAbono->getRowArray() : null;
             if (!$abono) {
                 return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Abono no encontrado.']);
             }
@@ -576,8 +616,8 @@ class BalanceDiario extends BaseController
             }
 
             $abonos = $model->obtenerAbonos($docId);
-            $doc = \Config\Database::connect()
-                ->table('tbl_documentos_pagar')->where('id', $docId)->get()->getRowArray();
+            $qDoc   = \Config\Database::connect()->table('tbl_documentos_pagar')->where('id', $docId)->get();
+            $doc    = ($qDoc && is_object($qDoc)) ? $qDoc->getRowArray() : null;
 
             return $this->response->setJSON([
                 'success' => true,

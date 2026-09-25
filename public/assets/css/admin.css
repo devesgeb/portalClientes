@@ -350,30 +350,35 @@ body {
     .page-body { padding: 16px; }
 
     .topbar {
-        padding: 10px 14px;
-        gap: 8px;
+        padding: 10px 12px;
+        gap: 6px;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
     /* Mostrar botón hamburger */
-    .btn-menu-toggle { display: flex; }
+    .btn-menu-toggle { display: flex; flex-shrink: 0; }
 
     /* Topbar: comprimir en móvil */
-    .topbar-title { font-size: .88rem; }
+    .topbar-title { font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
     .topbar-sub   { display: none; }
     .date-badge   { display: none; }
 
     /* User badge más compacto */
     .user-badge {
-        padding: 6px 10px 6px 8px;
-        gap: 7px;
+        padding: 5px 8px;
+        gap: 6px;
+        flex-shrink: 0;
     }
-    .ub-name { font-size: .75rem; }
+    .ub-name { font-size: .72rem; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ub-role { display: none; }
 
     /* Content area */
-    .content-area { padding: 20px 16px; }
+    .content-area { padding: 16px 12px; }
 }
 
 @media (max-width: 480px) {
-    .topbar-title { font-size: .82rem; }
+    .topbar-title { font-size: .80rem; max-width: 130px; }
+    .page-header-box { padding: 16px; border-radius: 12px; }
+    .stat-card { padding: 14px; }
 }

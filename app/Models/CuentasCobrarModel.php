@@ -47,22 +47,25 @@ class CuentasCobrarModel extends Model
     {
         $query = $this->db->query("
             SELECT d.*,
-                COALESCE(c.nombre, c.razon_social, d.rut_cliente) AS nombre_cliente
+                COALESCE(
+                    (SELECT COALESCE(c.nombre, c.razon_social) 
+                     FROM `tbl_clientes` c 
+                     WHERE c.rut = d.rut_cliente 
+                        OR REPLACE(REPLACE(REPLACE(c.rut, '.', ''), ' ', ''), '-', '') = REPLACE(REPLACE(REPLACE(d.rut_cliente, '.', ''), ' ', ''), '-', '') 
+                     ORDER BY c.id ASC LIMIT 1),
+                    d.rut_cliente
+                ) AS nombre_cliente
             FROM `tbl_documentos_cobrar` d
-            LEFT JOIN `tbl_clientes` c 
-               ON (
-                   c.rut COLLATE utf8mb4_unicode_ci = d.rut_cliente COLLATE utf8mb4_unicode_ci 
-                   OR REPLACE(REPLACE(REPLACE(c.rut, '.', ''), ' ', ''), '-', '') COLLATE utf8mb4_unicode_ci = REPLACE(REPLACE(REPLACE(d.rut_cliente, '.', ''), ' ', ''), '-', '') COLLATE utf8mb4_unicode_ci
-               )
             WHERE d.impago > 0
-            ORDER BY COALESCE(c.nombre, c.razon_social, d.rut_cliente) ASC, d.fecha DESC
+            ORDER BY nombre_cliente ASC, d.fecha DESC
         ");
         return $query ? $query->getResultArray() : [];
     }
 
     public function totalImpago(): float
     {
-        $row = $this->selectSum('impago')->get()->getRowArray();
+        $res = $this->selectSum('impago')->get();
+        $row = ($res && is_object($res)) ? $res->getRowArray() : null;
         return (float)($row['impago'] ?? 0);
     }
 
@@ -122,11 +125,12 @@ class CuentasCobrarModel extends Model
             if (empty($rutClean) || empty($docs)) continue;
 
             // ── Auto-crear o actualizar cliente en tbl_clientes ──
-            $existe = $db->table('tbl_clientes')
+            $qExiste = $db->table('tbl_clientes')
                 ->where('rut', $rutRaw)
                 ->orWhere('rut', $rutClean)
                 ->orWhere("REPLACE(REPLACE(REPLACE(rut, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
-                ->get()->getRowArray();
+                ->get();
+            $existe = ($qExiste && is_object($qExiste)) ? $qExiste->getRowArray() : null;
 
             if (!$existe) {
                 $db->table('tbl_clientes')->insert([

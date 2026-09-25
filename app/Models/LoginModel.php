@@ -27,16 +27,30 @@ class LoginModel extends Model
      */
     public function verificarLogin(string $username, string $password)
     {
+        // Intentar autenticación vía API De Facto primero
+        $apiResult = $this->verificarLoginConApi($username, $password);
+        if ($apiResult !== false) {
+            return [$apiResult];
+        }
+
+        // Si la API falla, continuar con la verificación local en la base de datos
         $db      = \Config\Database::connect();
         $builder = $db->table('tbl_usuarios');
+        
+        // Limpiar RUT (quitar puntos y guión por si el usuario lo ingresa con formato)
+        $cleanUsername = trim($username);
+        $cleanRut      = str_replace(['.', '-'], '', $cleanUsername);
+
         $builder->select('tbl_usuarios.id, tbl_usuarios.nombre, tbl_usuarios.apellidos,
                           tbl_usuarios.email, tbl_usuarios.rut, tbl_usuarios.telefono,
                           tbl_usuarios.clave, tbl_usuarios.estado, tbl_usuarios.perfil_id,
                           tbl_perfiles.nombre AS perfil_nombre')
                 ->join('tbl_perfiles', 'tbl_perfiles.id = tbl_usuarios.perfil_id', 'left')
                 ->groupStart()
-                    ->where('tbl_usuarios.nombre', $username)
-                    ->orWhere('tbl_usuarios.email', $username)
+                    ->where('tbl_usuarios.nombre', $cleanUsername)
+                    ->orWhere('tbl_usuarios.email', $cleanUsername)
+                    ->orWhere('tbl_usuarios.rut', $cleanUsername)
+                    ->orWhere("REPLACE(REPLACE(tbl_usuarios.rut, '.', ''), '-', '')", $cleanRut)
                 ->groupEnd()
                 ->where('tbl_usuarios.estado', 1);
 
@@ -46,23 +60,33 @@ class LoginModel extends Model
             return false;
         }
 
-        $user = $query->getRowArray();
+        $users = $query->getResultArray();
 
-        // Verificar clave: primero texto plano (legacy), luego hash
-        $claveAlmacenada = $user['clave'];
-        $claveValida = ($claveAlmacenada === $password)
-                    || password_verify($password, $claveAlmacenada);
+        foreach ($users as $user) {
+            $claveAlmacenada = $user['clave'];
+            $claveValida     = ($claveAlmacenada === $password)
+                            || password_verify($password, $claveAlmacenada);
 
-        if (!$claveValida) {
-            return false;
+            if ($claveValida) {
+                // Si la clave era texto plano (legacy), la migramos a password_hash por seguridad
+                if ($claveAlmacenada === $password && password_needs_rehash($claveAlmacenada, PASSWORD_DEFAULT)) {
+                    $nuevoHash = password_hash($password, PASSWORD_DEFAULT);
+                    $db->table('tbl_usuarios')
+                       ->where('id', $user['id'])
+                       ->update(['clave' => $nuevoHash]);
+                    $user['clave'] = $nuevoHash;
+                }
+
+                // Actualizar último acceso
+                $db->table('tbl_usuarios')
+                   ->where('id', $user['id'])
+                   ->update(['ultimo_acceso' => date('Y-m-d H:i:s')]);
+
+                return [$user];
+            }
         }
 
-        // Actualizar último acceso
-        $db->table('tbl_usuarios')
-           ->where('id', $user['id'])
-           ->update(['ultimo_acceso' => date('Y-m-d H:i:s')]);
-
-        return [$user];
+        return false;
     }
 
     /**

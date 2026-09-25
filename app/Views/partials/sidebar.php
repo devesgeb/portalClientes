@@ -39,36 +39,28 @@ function sbOpenClass(array $g, string $active): string
     bottom: 0 !important;
     height: 100vh !important;
     max-height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    z-index: 1000 !important;
-}
-.sidebar-logo {
-    flex-shrink: 0 !important;
-}
-.sidebar-nav {
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    max-height: calc(100vh - 120px) !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
+    z-index: 1000 !important;
     scrollbar-width: thin !important;
-    scrollbar-color: rgba(255, 255, 255, 0.35) rgba(0, 0, 0, 0.15) !important;
+    scrollbar-color: rgba(255, 255, 255, 0.4) rgba(0, 0, 0, 0.2) !important;
 }
+.sidebar::-webkit-scrollbar,
 .sidebar-nav::-webkit-scrollbar {
-    width: 7px !important;
+    width: 8px !important;
 }
+.sidebar::-webkit-scrollbar-thumb,
 .sidebar-nav::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.35) !important;
+    background: rgba(255, 255, 255, 0.4) !important;
     border-radius: 4px !important;
 }
+.sidebar::-webkit-scrollbar-track,
 .sidebar-nav::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.15) !important;
+    background: rgba(0, 0, 0, 0.2) !important;
 }
-.sidebar-foot {
-    flex-shrink: 0 !important;
+.sidebar-nav {
+    overflow-y: visible !important;
 }
 </style>
 
@@ -109,14 +101,14 @@ function sbOpenClass(array $g, string $active): string
             </a>
 
             <!-- Subgrupo Importar -->
-            <div class="sub-group-header px-3 py-1.5 mt-2 fw-bold text-uppercase d-flex align-items-center gap-1" style="font-size: 0.76rem; letter-spacing: 0.8px; color: #38bdf8; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
-                <i class="bi bi-cloud-arrow-up-fill me-1" style="font-size: 0.85rem;"></i> Importar
+            <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #38bdf8; padding: 10px 16px 4px 16px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 6px; display: flex; align-items: center; gap: 6px;">
+                <i class="bi bi-cloud-arrow-up-fill" style="font-size: 0.85rem;"></i> Importar
             </div>
-            <a href="<?= site_url('cobranza/facturas-facto') ?>" class="sub-link ps-4<?= (sbActive('facturas-facto', $activePage) || sbActive('importar-documentos-ventas', $activePage)) ?>">
-                <i class="bi bi-file-earmark-spreadsheet text-emerald-500 me-1"></i> Documentos Ventas
+            <a href="<?= site_url('facturacion/importar/ventas') ?>" class="sub-link ps-4<?= (sbActive('facturas-facto', $activePage) || sbActive('importar-documentos-ventas', $activePage)) ?>">
+                <i class="bi bi-file-earmark-spreadsheet text-emerald-400"></i> Documentos Ventas
             </a>
             <a href="<?= site_url('facturacion/importar/proveedores') ?>" class="sub-link ps-4<?= sbActive('importar-documentos-proveedores', $activePage) ?>">
-                <i class="bi bi-file-earmark-text text-amber-500 me-1"></i> Documentos Proveedores
+                <i class="bi bi-file-earmark-text text-amber-400"></i> Documentos Proveedores
             </a>
         </div>
 
@@ -162,6 +154,9 @@ function sbOpenClass(array $g, string $active): string
         <div class="sub-nav" id="menuBodega" class="sub-nav<?= sbOpenClass($bodegaOpen, $activePage) ?>">
             <a href="<?= site_url('productos') ?>" class="sub-link<?= sbActive('productos', $activePage) ?>">
                 <i class="bi bi-box-seam-fill"></i> Productos
+            </a>
+            <a href="<?= site_url('bodega/facto-productos') ?>" class="sub-link<?= sbActive('facto_productos', $activePage) ?>">
+                <i class="bi bi-box-seam text-info"></i> Productos Facto API
             </a>
             <a href="<?= site_url('carga-masiva-productos') ?>" class="sub-link<?= sbActive('carga-masiva-productos', $activePage) ?>">
                 <i class="bi bi-file-earmark-arrow-up-fill"></i> Carga masiva de productos
@@ -292,4 +287,258 @@ function sbOpenClass(array $g, string $active): string
             if (window.innerWidth <= 768) cerrarSidebar();
         });
     });
+</script>
+
+<!-- ── ESTILOS Y COMPONENTE DE NOTIFICACIONES GLOBAL EN TOPBAR ── -->
+<style>
+.notif-bell-btn {
+    position: relative;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+.notif-bell-btn:hover {
+    background: #f8fafc;
+    color: #0284c7;
+    border-color: #38bdf8;
+    transform: translateY(-1px);
+}
+.notif-badge-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 10px;
+    border: 2px solid #ffffff;
+    animation: pulseBadge 2s infinite;
+}
+@keyframes pulseBadge {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+.notif-dropdown-card {
+    position: fixed;
+    top: 65px;
+    right: 20px;
+    width: 370px;
+    max-width: calc(100vw - 40px);
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 16px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    z-index: 9999;
+    display: none;
+    overflow: hidden;
+    animation: fadeInDownNotif 0.2s ease-out;
+}
+@keyframes fadeInDownNotif {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.notif-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+.notif-body {
+    max-height: 360px;
+    overflow-y: auto;
+    padding: 12px;
+}
+.notif-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    transition: all 0.2s ease;
+}
+.notif-item:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+.btn-gestion-notif {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff !important;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 7px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    margin-top: 8px;
+    transition: all 0.2s ease;
+}
+.btn-gestion-notif:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+    box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+}
+</style>
+
+<!-- Panel Dropdown Notificaciones -->
+<div class="notif-dropdown-card" id="notifDropdownCard">
+    <div class="notif-header">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-bell-fill text-sky-400"></i> Notificaciones del Sistema
+        </div>
+        <button class="btn btn-sm text-slate-300 hover:text-white p-0" onclick="marcarNotificacionesLeidas()" style="font-size:0.75rem; border:none; background:none; text-decoration:underline; color:#cbd5e1;">
+            Marcar leídas
+        </button>
+    </div>
+    <div class="notif-body" id="notifListContainer">
+        <!-- Notificaciones cargadas vía JS -->
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initNotificacionesSystem();
+});
+
+function initNotificacionesSystem() {
+    var topbarRight = document.querySelector('.topbar > div.d-flex:last-child');
+    if (!topbarRight) return;
+
+    // Evitar inyección duplicada
+    if (document.getElementById('notifBellBtn')) return;
+
+    // Crear Botón Campanita
+    var bellWrap = document.createElement('div');
+    bellWrap.className = 'position-relative me-2';
+    bellWrap.innerHTML = `
+        <button class="notif-bell-btn" id="notifBellBtn" onclick="toggleNotifDropdown(event)" title="Notificaciones del Sistema">
+            <i class="bi bi-bell-fill"></i>
+            <span class="notif-badge-count" id="notifBadgeCount" style="display:none;">0</span>
+        </button>
+    `;
+
+    var userBadge = topbarRight.querySelector('.user-badge');
+    if (userBadge) {
+        topbarRight.insertBefore(bellWrap, userBadge);
+    } else {
+        topbarRight.appendChild(bellWrap);
+    }
+
+    // Cargar notificaciones no leídas
+    cargarNotificaciones();
+}
+
+function toggleNotifDropdown(e) {
+    if (e) e.stopPropagation();
+    var drop = document.getElementById('notifDropdownCard');
+    if (drop) {
+        var isOpen = drop.style.display === 'block';
+        drop.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) {
+            cargarNotificaciones();
+        }
+    }
+}
+
+document.addEventListener('click', function(e) {
+    var drop = document.getElementById('notifDropdownCard');
+    var btn = document.getElementById('notifBellBtn');
+    if (drop && drop.style.display === 'block') {
+        if (!drop.contains(e.target) && (!btn || !btn.contains(e.target))) {
+            drop.style.display = 'none';
+        }
+    }
+});
+
+function cargarNotificaciones() {
+    fetch('<?= site_url('notificaciones/obtener') ?>')
+        .then(function(res) { return res.json(); })
+        .then(function(res) {
+            if (!res || !res.success) return;
+            var badge = document.getElementById('notifBadgeCount');
+            var container = document.getElementById('notifListContainer');
+
+            if (res.unread_count > 0) {
+                if (badge) {
+                    badge.innerText = res.unread_count;
+                    badge.style.display = 'inline-block';
+                }
+            } else {
+                if (badge) badge.style.display = 'none';
+            }
+
+            if (!container) return;
+
+            if (res.data.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-slate-400" style="font-size:0.82rem;">
+                        <i class="bi bi-check2-circle d-block mb-2" style="font-size:1.6rem; color:#10b981;"></i>
+                        No tienes notificaciones pendientes
+                    </div>
+                `;
+                return;
+            }
+
+            var html = '';
+            res.data.forEach(function(item) {
+                html += `
+                    <div class="notif-item">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span class="fw-bold text-slate-800" style="font-size:0.84rem;">
+                                <i class="bi bi-cloud-download-fill text-sky-500 me-1"></i> ${item.titulo}
+                            </span>
+                            <span class="text-slate-400" style="font-size:0.70rem;">${item.created_at ? item.created_at.substring(11,16) : ''}</span>
+                        </div>
+                        <div class="text-slate-600 mb-2" style="font-size:0.80rem; line-height:1.35;">
+                            ${item.mensaje}
+                        </div>
+                        <div class="text-end">
+                            <a href="${item.url_accion}" onclick="marcarNotificacionesLeidas(${item.id});" class="btn-gestion-notif">
+                                <i class="bi bi-arrow-right-circle-fill"></i> Ir a gestionar
+                            </a>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        })
+        .catch(function(err) {
+            console.error('Error cargando notificaciones:', err);
+        });
+}
+
+function marcarNotificacionesLeidas(notifId) {
+    var bodyData = notifId ? JSON.stringify({ id: notifId }) : '{}';
+    fetch('<?= site_url('notificaciones/marcar-leidas') ?>', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: bodyData
+    })
+        .then(function(res) { return res.json(); })
+        .then(function(res) {
+            if (res && res.success) {
+                var badge = document.getElementById('notifBadgeCount');
+                if (badge && !notifId) badge.style.display = 'none';
+                cargarNotificaciones();
+            }
+        });
+}
 </script>

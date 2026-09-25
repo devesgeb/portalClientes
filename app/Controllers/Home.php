@@ -33,8 +33,8 @@ class Home extends BaseController
 
     public function validaUser()
     {
-        $username = $this->request->getPost('Usuario') ?? '';
-        $password = $this->request->getPost('Clave')   ?? '';
+        $username = trim($this->request->getPost('Usuario') ?? '');
+        $password = trim($this->request->getPost('Clave')   ?? '');
 
         if (!$username || !$password) {
             session()->setFlashdata('login_error', 'Por favor ingresa usuario y contraseña.');
@@ -44,11 +44,20 @@ class Home extends BaseController
         $check_user = $this->loginModel->verificarLogin($username, $password);
 
         if ($check_user !== false) {
+            $u = $check_user[0];
             $session = session();
             $session->set([
-                'is_logued_in' => $check_user[0]['id'],
-                'Nombre'       => $check_user[0]['nombre'],
+                'is_logued_in' => $u['id'],
+                'user_id'      => $u['id'],
+                'Nombre'       => $u['nombre'],
+                'Apellidos'    => $u['apellidos']     ?? '',
+                'Email'        => $u['email']         ?? '',
+                'Rut'          => $u['rut']           ?? '',
+                'Telefono'     => $u['telefono']      ?? '',
+                'Perfil'       => $u['perfil_nombre'] ?? 'Administrador',
+                'perfil_id'    => $u['perfil_id']     ?? 1,
             ]);
+
             return redirect()->to(site_url('admin'));
         }
 
@@ -76,10 +85,15 @@ class Home extends BaseController
         return $token;
     }
 
-    public function logout_ci()
+    public function logout()
     {
         session()->destroy();
         return redirect()->to(site_url('/'));
+    }
+
+    public function logout_ci()
+    {
+        return $this->logout();
     }
 
 

@@ -191,7 +191,7 @@
                             <tr>
                                 <th>Día</th>
                                 <th class="text-end">Cuentas por Cobrar</th>
-                                <th class="text-end">Caja / Inventario</th>
+                                <th class="text-end">Inventario</th>
                                 <th class="text-end">Cuentas por Pagar</th>
                                 <th class="text-end">Margen Neto Total</th>
                                 <th class="text-center">Detalle</th>

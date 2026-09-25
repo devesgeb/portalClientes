@@ -21,6 +21,13 @@ class FactoController extends BaseController
           `id` INT AUTO_INCREMENT PRIMARY KEY,
           `folio` VARCHAR(50) NOT NULL,
           `codigo_sii` INT NOT NULL DEFAULT 33,
+          `rut_cliente` VARCHAR(20) NULL,
+          `razon_social` VARCHAR(255) NULL,
+          `monto_neto` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          `monto_iva` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          `monto_total` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+          `fecha_emision` DATE NULL,
+          `estado_sii` VARCHAR(50) NULL,
           `estado_pago` ENUM('pendiente', 'pagada', 'parcial') NOT NULL DEFAULT 'pendiente',
           `monto_pagado` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
           `observacion` VARCHAR(255) NULL,
@@ -29,6 +36,30 @@ class FactoController extends BaseController
           UNIQUE KEY `uniq_facto_doc` (`folio`, `codigo_sii`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
         $db->query($sql);
+
+        // Migración de columnas adicionales si no existen
+        $cols = $db->getFieldNames('tbl_facto_pagos');
+        if (!in_array('rut_cliente', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `rut_cliente` VARCHAR(20) NULL AFTER `codigo_sii`;");
+        }
+        if (!in_array('razon_social', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `razon_social` VARCHAR(255) NULL AFTER `rut_cliente`;");
+        }
+        if (!in_array('monto_neto', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `monto_neto` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `razon_social`;");
+        }
+        if (!in_array('monto_iva', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `monto_iva` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `monto_neto`;");
+        }
+        if (!in_array('monto_total', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `monto_total` DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER `monto_iva`;");
+        }
+        if (!in_array('fecha_emision', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `fecha_emision` DATE NULL AFTER `monto_total`;");
+        }
+        if (!in_array('estado_sii', $cols, true)) {
+            $db->query("ALTER TABLE `tbl_facto_pagos` ADD COLUMN `estado_sii` VARCHAR(50) NULL AFTER `fecha_emision`;");
+        }
     }
 
     /**
@@ -46,442 +77,131 @@ class FactoController extends BaseController
 
     /**
      * GET /cobranza/facto/buscar-dtes
-     * Consulta documentos emitidos desde la API oficial de Facto y cruza con sus estados de pago locales.
+     * Consulta directamente la tabla local tbl_facto_pagos (cargada/sincronizada por el Cron).
      */
     public function buscarDtes(): ResponseInterface
     {
-        $fechaInicio = $this->request->getGet('fecha_inicio');
-        $fechaFin = $this->request->getGet('fecha_fin');
-        $numero = trim((string) ($this->request->getGet('numero') ?? ''));
-        $cliente = trim((string) ($this->request->getGet('cliente') ?? ''));
-        $tipoDte = trim((string) ($this->request->getGet('tipo_dte') ?? ''));
-        $estadoFiltro = trim((string) ($this->request->getGet('estado_pago') ?? '')); // filtro por estado de pago
-        $requestedPage = (int) ($this->request->getGet('page') ?: 1);
+        $db = \Config\Database::connect();
+        $this->ensureTableExists();
 
-        $token = $this->getFactoToken();
+        $fechaInicio   = $this->request->getGet('fecha_inicio');
+        $fechaFin      = $this->request->getGet('fecha_fin');
+        $numero        = trim((string) ($this->request->getGet('numero') ?? ''));
+        $cliente       = trim((string) ($this->request->getGet('cliente') ?? ''));
+        $tipoDte       = trim((string) ($this->request->getGet('tipo_dte') ?? ''));
+        $estadoFiltro  = trim((string) ($this->request->getGet('estado_pago') ?? ''));
 
-        if (!$token) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Error al autenticar con la API de Facto. Verifique credenciales FACTO_* en el archivo .env.'
-            ]);
-        }
+        // Si el usuario no especificó filtro de estado explícito, por defecto consulta 'todos' los documentos
+        $targetEstado = ($estadoFiltro !== '') ? $estadoFiltro : 'todos';
 
-        // Mapeo del código de DTE SII a document_type_id nativo de Facto API
-        $typeIdMap = [
-            '33' => 2,   // Facturas Electrónicas
-            '52' => 54,  // Guías de Despacho Electrónicas
-            '39' => 7,   // Boletas Electrónicas
-            '61' => 16,  // Notas de Crédito Electrónicas
-        ];
-
-        // Construir query params nativos para Facto API
-        $queryParams = [
-            'received_issued_flag' => 1 // 1 = Documentos Emitidos
-        ];
+        $builder = $db->table('tbl_facto_pagos');
 
         if ($numero !== '') {
-            $queryParams['document_number'] = $numero;
+            $builder->like('folio', $numero);
         }
         if ($cliente !== '') {
-            $cleanRut = preg_replace('/[^0-9kK-]/', '', $cliente);
-            if (!empty($cleanRut)) {
-                $queryParams['receiver_tax_id_code'] = $cleanRut;
-            }
+            $builder->groupStart()
+                    ->like('rut_cliente', $cliente)
+                    ->orLike('razon_social', $cliente)
+                    ->groupEnd();
         }
-        if ($fechaInicio) {
-            $queryParams['issue_date_from'] = $fechaInicio;
+        if ($tipoDte !== '') {
+            $builder->where('codigo_sii', (int)$tipoDte);
         }
-        if ($fechaFin) {
-            $queryParams['issue_date_to'] = $fechaFin;
+        if ($targetEstado !== 'todos') {
+            $builder->where('estado_pago', $targetEstado);
         }
-        if ($tipoDte && isset($typeIdMap[$tipoDte])) {
-            $queryParams['document_type_id'] = $typeIdMap[$tipoDte];
+        if (!empty($fechaInicio) && !empty($fechaFin)) {
+            $builder->groupStart()
+                        ->groupStart()
+                            ->where('fecha_emision >=', $fechaInicio)
+                            ->where('fecha_emision <=', $fechaFin)
+                        ->groupEnd()
+                        ->orGroupStart()
+                            ->where('DATE(created_at) >=', $fechaInicio)
+                            ->where('DATE(created_at) <=', $fechaFin)
+                        ->groupEnd()
+                    ->groupEnd();
+        } elseif (!empty($fechaInicio)) {
+            $builder->groupStart()
+                        ->where('fecha_emision >=', $fechaInicio)
+                        ->orWhere('DATE(created_at) >=', $fechaInicio)
+                    ->groupEnd();
+        } elseif (!empty($fechaFin)) {
+            $builder->groupStart()
+                        ->where('fecha_emision <=', $fechaFin)
+                        ->orWhere('DATE(created_at) <=', $fechaFin)
+                    ->groupEnd();
         }
 
-        $rawItems   = [];
-        $totalItems = 0;
-        $totalPages = 1;
-        $todayDate  = date('Y-m-d');
-        $db = \Config\Database::connect();
+        $builder->orderBy('fecha_emision', 'DESC');
+        $builder->orderBy('CAST(folio AS UNSIGNED)', 'DESC');
 
-        // 1. Si no hay fecha de inicio explícita ni folio puntual, consultar a Facto API trayendo HOY y el AÑO ACTUAL (desde 2026-01-01)
-        if (!$fechaInicio && $numero === '') {
-            // A. DTEs de HOY
-            $todayParams = $queryParams;
-            $todayParams['issue_date_from'] = $todayDate;
-            $todayParams['limit'] = 100;
-            $urlToday = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($todayParams);
+        $rows = $builder->get()->getResultArray();
 
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $urlToday);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-            $respToday = curl_exec($ch);
-            $codeToday = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($codeToday === 200 && $respToday) {
-                $dToday = json_decode($respToday, true);
-                $itemsToday = $dToday['_embedded']['documents'] ?? $dToday['_embedded']['items'] ?? [];
-                foreach ($itemsToday as $it) {
-                    $rawItems[] = $it;
+        // Cargar folios cargados en Cuentas por Cobrar (tbl_documentos_cobrar)
+        $cobrarFolios = [];
+        if ($db->tableExists('tbl_documentos_cobrar')) {
+            $rowsCobrar = $db->table('tbl_documentos_cobrar')->select('numero')->get()->getResultArray();
+            foreach ($rowsCobrar as $c) {
+                $fRaw   = trim((string)$c['numero']);
+                $fClean = ltrim($fRaw, '0');
+                if ($fRaw !== '' && $fRaw !== 'N/A') {
+                    $cobrarFolios[$fRaw] = true;
                 }
-            }
-
-            // B. DTEs del Año Actual (desde 2026-01-01) con paginación
-            $yearParams = $queryParams;
-            $yearParams['issue_date_from'] = date('Y-01-01');
-            $yearParams['limit'] = 100;
-
-            for ($page = 1; $page <= 5; $page++) {
-                $yearParams['page'] = $page;
-                $urlYear = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($yearParams);
-
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $urlYear);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-                $respYear = curl_exec($ch);
-                $codeYear = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($codeYear === 200 && $respYear) {
-                    $dYear = json_decode($respYear, true);
-                    $itemsYear = $dYear['_embedded']['documents'] ?? $dYear['_embedded']['items'] ?? [];
-                    if (empty($itemsYear)) {
-                        break;
-                    }
-                    $existingIds = array_filter(array_column($rawItems, 'document_id'));
-                    foreach ($itemsYear as $it) {
-                        $dId = $it['document_id'] ?? null;
-                        if ($dId && !in_array($dId, $existingIds, true)) {
-                            $rawItems[] = $it;
-                        }
-                    }
-                    if (count($itemsYear) < 100) {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        } else {
-            // Consulta normal con filtros de usuario
-            $currentParams = $queryParams;
-            $currentParams['page'] = $requestedPage;
-            $url = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($currentParams);
-
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($httpCode === 200 && $response) {
-                $data = json_decode($response, true);
-                $rawItems = $data['_embedded']['documents'] ?? $data['_embedded']['items'] ?? [];
-            }
-        }
-
-        // 2. Si el filtro es "pendiente", complementar además con folios impagos de la BD que no hayan venido en la página actual
-        if ($estadoFiltro === 'pendiente') {
-            $pendingFoliosList = [];
-
-            // A. Folios pendientes en tbl_facto_pagos
-            if ($db->tableExists('tbl_facto_pagos')) {
-                $factoFolios = $db->table('tbl_facto_pagos')->select('folio')->where('estado_pago', 'pendiente')->get()->getResultArray();
-                foreach ($factoFolios as $ff) {
-                    $f = trim((string)$ff['folio']);
-                    if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
-                        $pendingFoliosList[] = $f;
-                    }
-                }
-            }
-
-            // B. Folios impagos en tbl_documentos_cobrar
-            if ($db->tableExists('tbl_documentos_cobrar')) {
-                $cobrarFolios = $db->table('tbl_documentos_cobrar')->select('numero')->where('impago >', 0)->get()->getResultArray();
-                foreach ($cobrarFolios as $cf) {
-                    $f = trim((string)$cf['numero']);
-                    if ($f !== '' && $f !== 'N/A' && !in_array($f, $pendingFoliosList, true)) {
-                        $pendingFoliosList[] = $f;
-                    }
-                }
-            }
-
-            // C. Consultar folios de la BD faltantes vía cURL multi en lotes de 15 peticiones paralelas
-            if (!empty($pendingFoliosList)) {
-                $existingFolios = array_filter(array_column($rawItems, 'document_number'));
-                $foliosToFetch = [];
-                foreach ($pendingFoliosList as $f) {
-                    if (!in_array((string)$f, array_map('strval', $existingFolios), true)) {
-                        $foliosToFetch[] = $f;
-                    }
-                }
-
-                if (!empty($foliosToFetch)) {
-                    $chunks = array_chunk($foliosToFetch, 15);
-                    foreach ($chunks as $chunk) {
-                        $mh = curl_multi_init();
-                        $handles = [];
-                        foreach ($chunk as $f) {
-                            $pParams = $queryParams;
-                            $pParams['document_number'] = $f;
-                            $pUrl = 'https://api-billing.koywe.com/V1/documents?' . http_build_query($pParams);
-
-                            $ch = curl_init();
-                            curl_setopt($ch, CURLOPT_URL, $pUrl);
-                            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-                            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-                            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
-                            curl_multi_add_handle($mh, $ch);
-                            $handles[$f] = $ch;
-                        }
-
-                        if (!empty($handles)) {
-                            $active = null;
-                            do {
-                                $mrc = curl_multi_exec($mh, $active);
-                            } while ($mrc === CURLM_CALL_MULTI_PERFORM);
-
-                            while ($active && $mrc === CURLM_OK) {
-                                if (curl_multi_select($mh) === -1) {
-                                    usleep(500);
-                                }
-                                do {
-                                    $mrc = curl_multi_exec($mh, $active);
-                                } while ($mrc === CURLM_CALL_MULTI_PERFORM);
-                            }
-
-                            foreach ($handles as $f => $ch) {
-                                $resP = curl_multi_getcontent($ch);
-                                if ($resP) {
-                                    $dP = json_decode($resP, true);
-                                    $dList = $dP['_embedded']['documents'] ?? $dP['_embedded']['items'] ?? [];
-                                    if (!empty($dList)) {
-                                        foreach ($dList as $docObj) {
-                                            $rawItems[] = $docObj;
-                                        }
-                                    }
-                                }
-                                curl_multi_remove_handle($mh, $ch);
-                                curl_close($ch);
-                            }
-                        }
-                        curl_multi_close($mh);
-                    }
-                }
-            }
-        }
-
-        if (empty($rawItems) && $requestedPage === 1) {
-            return $this->response->setJSON([
-                'success' => true,
-                'data'    => [],
-                'total_monto' => 0,
-                'pagination'  => ['current_page' => 1, 'total_pages' => 1, 'count' => 0]
-            ]);
-        }
-
-        $db = \Config\Database::connect();
-        $estadosLocales     = [];
-        $pendientesPorFolio = [];
-
-        // 1. Cargar overrides o estados guardados explícitamente en tbl_facto_pagos
-        $rowsFacto = $db->table('tbl_facto_pagos')->get()->getResultArray();
-        foreach ($rowsFacto as $r) {
-            $key = trim((string)$r['folio']) . '_' . $r['codigo_sii'];
-            $estadosLocales[$key] = [
-                'estado_pago'  => $r['estado_pago'],
-                'monto_pagado' => (float) $r['monto_pagado'],
-                'observacion'  => $r['observacion']
-            ];
-        }
-
-        // 2. Cargar TODAS las impagas en tbl_documentos_cobrar por numero (folio)
-        $rowsCobrar = $db->table('tbl_documentos_cobrar')->where('impago >', 0)->get()->getResultArray();
-        foreach ($rowsCobrar as $c) {
-            $folioRaw   = trim((string)$c['numero']);
-            $folioClean = ltrim($folioRaw, '0');
-            $impago     = (float)($c['impago'] ?? 0);
-            $pagado     = (float)($c['pagado'] ?? 0);
-            $st         = 'pendiente';
-
-            $dataItem = [
-                'estado_pago'  => $st,
-                'monto_pagado' => $pagado,
-                'impago'       => $impago,
-                'observacion'  => 'Cuentas por Cobrar (Deuda Impaga)'
-            ];
-
-            if ($folioRaw !== '') {
-                $pendientesPorFolio[$folioRaw] = $dataItem;
-            }
-            if ($folioClean !== '') {
-                $pendientesPorFolio[$folioClean] = $dataItem;
-            }
-        }
-
-        // 3. Cargar TODAS las impagas en tbl_documentos_pagar por numero (folio) si existe
-        if ($db->tableExists('tbl_documentos_pagar')) {
-            $rowsPagar = $db->table('tbl_documentos_pagar')->where('impago >', 0)->get()->getResultArray();
-            foreach ($rowsPagar as $p) {
-                $folioRaw   = trim((string)$p['numero']);
-                $folioClean = ltrim($folioRaw, '0');
-                $impago     = (float)($p['impago'] ?? 0);
-                $pagado     = (float)($p['pagado'] ?? 0);
-                $st         = ($pagado > 0) ? 'parcial' : 'pendiente';
-
-                $dataItem = [
-                    'estado_pago'  => $st,
-                    'monto_pagado' => $pagado,
-                    'impago'       => $impago,
-                    'observacion'  => 'Cuentas por Pagar (Deuda Impaga)'
-                ];
-
-                if ($folioRaw !== '' && !isset($pendientesPorFolio[$folioRaw])) {
-                    $pendientesPorFolio[$folioRaw] = $dataItem;
-                }
-                if ($folioClean !== '' && !isset($pendientesPorFolio[$folioClean])) {
-                    $pendientesPorFolio[$folioClean] = $dataItem;
+                if ($fClean !== '') {
+                    $cobrarFolios[$fClean] = true;
                 }
             }
         }
 
         $documentos = [];
-        $totalMontoBatch = 0;
-        $todayDate = date('Y-m-d'); // 2026-07-27
+        $totalMonto = 0.00;
 
-        foreach ($rawItems as $item) {
-            $folioDoc = (string) ($item['document_number'] ?? '');
-            if ($numero !== '' && strpos($folioDoc, $numero) === false) {
-                continue;
-            }
-
-            $rutDoc = (string) ($item['receiver_tax_id_code'] ?? '');
-            $nombreDoc = (string) ($item['receiver_legal_name'] ?? '');
-            if ($cliente !== '') {
-                $qLower = strtolower($cliente);
-                if (strpos(strtolower($rutDoc), $qLower) === false && strpos(strtolower($nombreDoc), $qLower) === false) {
-                    continue;
-                }
-            }
-
-            $taxBureauCode = (int) ($item['document_type_taxbureau'] ?? 0);
-            $tipoNombre = $this->getTipoDteNombre($taxBureauCode);
-
-            $neto  = (float) ($item['net_amount'] ?? 0);
-            $iva   = (float) ($item['taxes_amount'] ?? 0);
-            $total = (float) ($item['total_amount'] ?? 0);
-            $docFecha = trim((string)($item['issue_date'] ?? ''));
-
-            // Determinación por Base de Datos y Fecha:
-            // 1. Si existe en tbl_facto_pagos (modificado manualmente), respetar ese estado.
-            // 2. Si es de HOY (27/07/2026), marcar como 'pendiente' (impaga por ser emitida hoy).
-            // 3. Si existe en cuentas por cobrar/pagar con impago > 0, asignar 'pendiente' o 'parcial'.
-            // 4. Si NO existe en cuentas impagas y NO es de hoy, marcar como 'pagada' automáticamente.
-            $localKey      = $folioDoc . '_' . $taxBureauCode;
+        foreach ($rows as $r) {
+            $taxBureauCode = (int)$r['codigo_sii'];
+            $tipoNombre    = $this->getTipoDteNombre($taxBureauCode);
+            $totalDoc      = (float)$r['monto_total'];
+            $folioDoc      = trim((string)$r['folio']);
             $folioDocClean = ltrim($folioDoc, '0');
 
-            if (isset($pendientesPorFolio[$folioDoc])) {
-                $estadoPago  = $pendientesPorFolio[$folioDoc]['estado_pago'];
-                $montoPagado = $pendientesPorFolio[$folioDoc]['monto_pagado'];
-                $total       = $pendientesPorFolio[$folioDoc]['impago'];
-                $obs         = 'Cuentas por Cobrar (Deuda Impaga)';
-            } elseif (isset($pendientesPorFolio[$folioDocClean])) {
-                $estadoPago  = $pendientesPorFolio[$folioDocClean]['estado_pago'];
-                $montoPagado = $pendientesPorFolio[$folioDocClean]['monto_pagado'];
-                $total       = $pendientesPorFolio[$folioDocClean]['impago'];
-                $obs         = 'Cuentas por Cobrar (Deuda Impaga)';
-            } elseif (isset($estadosLocales[$localKey])) {
-                $estadoPago  = $estadosLocales[$localKey]['estado_pago'];
-                $montoPagado = $estadosLocales[$localKey]['monto_pagado'];
-                $obs         = ($estadosLocales[$localKey]['observacion'] === 'Cuentas por Cobrar (Deuda Impaga)')
-                               ? 'Pendiente por Cargar a Cuentas por Cobrar'
-                               : $estadosLocales[$localKey]['observacion'];
-            } elseif ($docFecha === $todayDate) {
-                $estadoPago  = 'pendiente';
-                $montoPagado = 0.0;
-                $obs         = 'Emitida hoy (' . $docFecha . ') - Pendiente por Cargar';
-            } elseif (!empty($docFecha) && $docFecha >= '2026-01-01') {
-                $estadoPago  = 'pendiente';
-                $montoPagado = 0.0;
-                $obs         = 'Pendiente por Cargar a Cuentas por Cobrar';
-            } else {
-                $estadoPago  = 'pagada';
-                $montoPagado = $total;
-                $obs         = 'Conciliado (Histórico)';
-            }
-
-            // Filtrar si el usuario seleccionó un estado de pago específico
-            if ($estadoFiltro !== '' && $estadoPago !== $estadoFiltro) {
-                continue;
-            }
-
-            $totalMontoBatch += $total;
+            $obs            = (string)($r['observacion'] ?? '');
+            $isManualCargado = (
+                strripos($obs, 'Cargado') !== false || 
+                strripos($obs, 'Conciliado') !== false || 
+                strripos($obs, 'Pagada') !== false || 
+                strripos($obs, 'Cobrar') !== false ||
+                $r['estado_pago'] === 'pagada'
+            );
+            $existeEnCobrar = isset($cobrarFolios[$folioDoc]) || isset($cobrarFolios[$folioDocClean]);
+            $estadoFlujo   = ($existeEnCobrar || $isManualCargado) ? 'cargado' : 'pendiente';
 
             $documentos[] = [
-                'id' => $item['document_id'] ?? null,
-                'folio' => $folioDoc ?: '—',
-                'fecha' => $item['issue_date'] ?? '—',
-                'codigo_sii' => $taxBureauCode,
+                'id'             => $r['id'],
+                'folio'          => $r['folio'],
+                'fecha'          => $r['fecha_emision'] ?? '—',
+                'codigo_sii'     => $taxBureauCode,
                 'tipo_documento' => $tipoNombre,
-                'cliente_rut' => $rutDoc ?: '—',
-                'cliente_nombre' => $nombreDoc ?: '—',
-                'neto' => $neto,
-                'iva' => $iva,
-                'total' => $total,
-                'estado_sii' => ((int) ($item['taxbureau_sending_status'] ?? 0) === 1) ? 'Aceptado' : 'Pendiente',
-                'estado_pago' => $estadoPago,
-                'monto_pagado' => $montoPagado,
-                'observacion' => $obs
+                'cliente_rut'    => $r['rut_cliente'] ?: '—',
+                'cliente_nombre' => $r['razon_social'] ?: '—',
+                'neto'           => (float)$r['monto_neto'],
+                'iva'            => (float)$r['monto_iva'],
+                'total'          => $totalDoc,
+                'estado_sii'     => $r['estado_sii'] ?: 'Aceptado',
+                'estado_pago'    => $r['estado_pago'],
+                'estado_flujo'   => $estadoFlujo,
+                'monto_pagado'   => (float)$r['monto_pagado'],
+                'observacion'    => $r['observacion'] ?: 'Facto'
             ];
+
+            $totalMonto += $totalDoc;
         }
-
-        // Deduplicación limpia por Folio (evita duplicidad Guía DTE 52 + Factura DTE 33)
-        $uniqueDocs = [];
-        $seen = [];
-        $totalMontoBatch = 0;
-        foreach ($documentos as $doc) {
-            $key = trim((string)$doc['folio']);
-            if (!isset($seen[$key])) {
-                $seen[$key] = true;
-                $uniqueDocs[] = $doc;
-                $totalMontoBatch += (float)$doc['total'];
-            }
-        }
-        $documentos = $uniqueDocs;
-
-        // Ordenar por fecha descendente (lo más reciente de HOY 2026 arriba)
-        usort($documentos, function($a, $b) {
-            $fa = $a['fecha'] ?? '';
-            $fb = $b['fecha'] ?? '';
-            if ($fa === $fb) {
-                return (int)($b['folio'] ?? 0) - (int)($a['folio'] ?? 0);
-            }
-            return strcmp($fb, $fa);
-        });
-
-        $totalCount  = count($documentos);
-        $calcPages   = (int)ceil($totalCount / 25);
-        $totalPages  = max(1, $calcPages);
 
         return $this->response->setJSON([
             'success'     => true,
             'data'        => $documentos,
-            'total_monto' => $totalMontoBatch,
-            'pagination'  => [
-                'current_page' => 1,
-                'total_pages'  => $totalPages,
-                'count'        => $totalCount
-            ]
+            'total_monto' => $totalMonto,
+            'pagination'  => ['current_page' => 1, 'total_pages' => 1, 'count' => count($documentos)]
         ]);
     }
 
@@ -491,8 +211,16 @@ class FactoController extends BaseController
      */
     public function actualizarEstadoPago(): ResponseInterface
     {
-        $raw = $this->request->getBody();
-        $json = json_decode($raw, true) ?: $this->request->getPost();
+        $json = [];
+        try {
+            $json = $this->request->getJSON(true) ?: [];
+        } catch (\Throwable $t) {
+            $json = [];
+        }
+        if (empty($json)) {
+            $raw = $this->request->getBody();
+            $json = json_decode($raw, true) ?: $this->request->getPost();
+        }
 
         $folio = trim((string) ($json['folio'] ?? ''));
         $codigoSii = (int) ($json['codigo_sii'] ?? 33);
@@ -518,11 +246,50 @@ class FactoController extends BaseController
 
         $db->query($sql, [$folio, $codigoSii, $estadoPago, $montoPagado, $obs]);
 
-        if ($estadoPago === 'pagada') {
-            $db->table('tbl_documentos_cobrar')->where('numero', $folio)->update([
-                'impago' => 0.00,
-                'updated_at' => date('Y-m-d H:i:s')
-            ]);
+        if ($estadoPago === 'pendiente') {
+            $folioClean = ltrim($folio, '0');
+            $factoRow = $db->table('tbl_facto_pagos')
+                           ->groupStart()
+                               ->where('folio', $folio)
+                               ->orWhere('folio', $folioClean)
+                           ->groupEnd()
+                           ->get()->getRowArray();
+
+            $existingCobrar = $db->table('tbl_documentos_cobrar')
+                                 ->groupStart()
+                                     ->where('numero', $folio)
+                                     ->orWhere('numero', $folioClean)
+                                 ->groupEnd()
+                                 ->get()->getRowArray();
+
+            if ($existingCobrar) {
+                $montoTotal = $factoRow ? (float)$factoRow['monto_total'] : (float)$existingCobrar['total'];
+                $db->table('tbl_documentos_cobrar')->where('id', $existingCobrar['id'])->update([
+                    'impago'     => $montoTotal,
+                    'pagado'     => 0.00,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            } else if ($factoRow) {
+                $db->table('tbl_documentos_cobrar')->insert([
+                    'rut_cliente'    => !empty($factoRow['rut_cliente']) ? $factoRow['rut_cliente'] : 'N/A',
+                    'tipo_documento' => $this->getTipoDteNombre((int)$factoRow['codigo_sii']),
+                    'numero'         => $folio,
+                    'fecha'          => $factoRow['fecha_emision'] ?? date('Y-m-d'),
+                    'total'          => (float)$factoRow['monto_total'],
+                    'pagado'         => 0.00,
+                    'impago'         => (float)$factoRow['monto_total'],
+                    'created_at'     => date('Y-m-d H:i:s'),
+                    'updated_at'     => date('Y-m-d H:i:s')
+                ]);
+            }
+        } else if ($estadoPago === 'pagada') {
+            $folioClean = ltrim($folio, '0');
+            $db->table('tbl_documentos_cobrar')
+               ->groupStart()
+                   ->where('numero', $folio)
+                   ->orWhere('numero', $folioClean)
+               ->groupEnd()
+               ->delete();
         }
 
         return $this->response->setJSON([
@@ -567,11 +334,50 @@ class FactoController extends BaseController
                       `updated_at` = CURRENT_TIMESTAMP";
             $db->query($sql, [$folio, $codigoSii, $nuevoEstado]);
 
-            if ($nuevoEstado === 'pagada') {
-                $db->table('tbl_documentos_cobrar')->where('numero', $folio)->update([
-                    'impago' => 0.00,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
+            if ($nuevoEstado === 'pendiente') {
+                $folioClean = ltrim($folio, '0');
+                $factoRow = $db->table('tbl_facto_pagos')
+                               ->groupStart()
+                                   ->where('folio', $folio)
+                                   ->orWhere('folio', $folioClean)
+                               ->groupEnd()
+                               ->get()->getRowArray();
+
+                $existingCobrar = $db->table('tbl_documentos_cobrar')
+                                     ->groupStart()
+                                         ->where('numero', $folio)
+                                         ->orWhere('numero', $folioClean)
+                                     ->groupEnd()
+                                     ->get()->getRowArray();
+
+                if ($existingCobrar) {
+                    $montoTotal = $factoRow ? (float)$factoRow['monto_total'] : (float)$existingCobrar['total'];
+                    $db->table('tbl_documentos_cobrar')->where('id', $existingCobrar['id'])->update([
+                        'impago'     => $montoTotal,
+                        'pagado'     => 0.00,
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                } else if ($factoRow) {
+                    $db->table('tbl_documentos_cobrar')->insert([
+                        'rut_cliente'    => !empty($factoRow['rut_cliente']) ? $factoRow['rut_cliente'] : 'N/A',
+                        'tipo_documento' => $this->getTipoDteNombre((int)$factoRow['codigo_sii']),
+                        'numero'         => $folio,
+                        'fecha'          => $factoRow['fecha_emision'] ?? date('Y-m-d'),
+                        'total'          => (float)$factoRow['monto_total'],
+                        'pagado'         => 0.00,
+                        'impago'         => (float)$factoRow['monto_total'],
+                        'created_at'     => date('Y-m-d H:i:s'),
+                        'updated_at'     => date('Y-m-d H:i:s')
+                    ]);
+                }
+            } else if ($nuevoEstado === 'pagada') {
+                $folioClean = ltrim($folio, '0');
+                $db->table('tbl_documentos_cobrar')
+                   ->groupStart()
+                       ->where('numero', $folio)
+                       ->orWhere('numero', $folioClean)
+                   ->groupEnd()
+                   ->delete();
             }
 
             $updatedCount++;
@@ -583,6 +389,179 @@ class FactoController extends BaseController
             'success' => true,
             'message' => "Se actualizaron {$updatedCount} documentos a '{$nuevoEstado}' correctamente.",
             'count' => $updatedCount
+        ]);
+    }
+
+    /**
+     * POST /cobranza/facto/actualizar-estado-flujo
+     * Actualiza manualmente el estado de flujo (cargado vs pendiente) en tbl_facto_pagos.
+     */
+    public function actualizarEstadoFlujo(): ResponseInterface
+    {
+        $json = [];
+        try {
+            $json = $this->request->getJSON(true) ?: [];
+        } catch (\Throwable $t) {
+            $json = [];
+        }
+        if (empty($json)) {
+            $raw = $this->request->getBody();
+            $json = json_decode($raw, true) ?: $this->request->getPost();
+        }
+
+        $folio       = trim((string)($json['folio'] ?? ''));
+        $codigoSii   = (int)($json['codigo_sii'] ?? 33);
+        $estadoFlujo = trim((string)($json['estado_flujo'] ?? ''));
+
+        if (empty($folio) || !in_array($estadoFlujo, ['cargado', 'pendiente'], true)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Folio o estado de flujo inválido.'
+            ]);
+        }
+
+        $folioClean = ltrim($folio, '0');
+        $db = \Config\Database::connect();
+
+        $obs = ($estadoFlujo === 'cargado') ? 'Cargado / Conciliado en Ventas' : 'Facto';
+
+        $exists = $db->table('tbl_facto_pagos')
+            ->where('folio', $folio)
+            ->orWhere('folio', $folioClean)
+            ->get()->getRowArray();
+
+        if ($exists) {
+            $db->query(
+                "UPDATE `tbl_facto_pagos` SET `observacion` = ?, `updated_at` = NOW() WHERE `folio` = ? OR `folio` = ?",
+                [$obs, $folio, $folioClean]
+            );
+        } else {
+            $db->table('tbl_facto_pagos')->insert([
+                'folio'        => $folio,
+                'codigo_sii'   => $codigoSii,
+                'observacion'  => $obs,
+                'estado_pago'  => 'pendiente',
+                'monto_neto'   => 0.00,
+                'monto_iva'    => 0.00,
+                'monto_total'  => 0.00,
+                'created_at'   => date('Y-m-d H:i:s'),
+                'updated_at'   => date('Y-m-d H:i:s')
+            ]);
+        }
+
+        $label = ($estadoFlujo === 'cargado') ? 'Cargado' : 'Pendiente';
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Estado de flujo del folio {$folio} actualizado a '{$label}'."
+        ]);
+    }
+
+    /**
+     * POST /cobranza/facto/marcar-pagadas-desde-cobrar
+     * Actualiza el estado a 'pagada' o reactiva a 'pendiente' en tbl_facto_pagos y sincroniza tbl_documentos_cobrar.
+     */
+    /**
+     * POST /cobranza/facto/marcar-pagadas-desde-cobrar
+     * Actualiza el estado a 'pagada' o reactiva a 'pendiente' en tbl_documentos_cobrar y tbl_facto_pagos.
+     */
+    public function marcarPagadasDesdeCobrar(): ResponseInterface
+    {
+        $raw = $this->request->getBody();
+        $json = json_decode($raw, true) ?: $this->request->getPost();
+        $documentos = $json['documentos'] ?? [];
+
+        if (empty($documentos)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'No se enviaron documentos para actualizar.'
+            ]);
+        }
+
+        $db = \Config\Database::connect();
+        $db->transStart();
+
+        $updatedCount = 0;
+        foreach ($documentos as $doc) {
+            $folioRaw    = trim((string)($doc['nro'] ?? $doc['numero'] ?? $doc['folio'] ?? ''));
+            $rutRaw      = trim((string)($doc['rut'] ?? $doc['rut_cliente'] ?? ''));
+            $nuevoEstado = strtolower(trim((string)($doc['estado'] ?? 'pagada')));
+
+            if (empty($folioRaw) || $folioRaw === 'N/A' || $folioRaw === '—') {
+                continue;
+            }
+
+            $folioClean = ltrim($folioRaw, '0');
+            if (empty($folioClean)) $folioClean = '0';
+            $rutClean   = !empty($rutRaw) ? str_replace(['.', ' ', '-'], '', strtoupper($rutRaw)) : '';
+
+            $esPagada   = ($nuevoEstado === 'pagado' || $nuevoEstado === 'pagada');
+
+            // 1. Actualizar tbl_documentos_cobrar
+            $builderCobrar = $db->table('tbl_documentos_cobrar')
+                ->groupStart()
+                    ->where('numero', $folioRaw)
+                    ->orWhere('numero', $folioClean)
+                    ->orWhere("TRIM(LEADING '0' FROM TRIM(numero)) = '{$folioClean}'")
+                ->groupEnd();
+
+            if (!empty($rutClean)) {
+                $builderCobrar->groupStart()
+                    ->where('rut_cliente', $rutRaw)
+                    ->orWhere('rut_cliente', $rutClean)
+                    ->orWhere("REPLACE(REPLACE(REPLACE(rut_cliente, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
+                ->groupEnd();
+            }
+
+            $resCobrar = $builderCobrar->get();
+            $existingCobrar = ($resCobrar && is_object($resCobrar)) ? $resCobrar->getRowArray() : null;
+
+            if ($existingCobrar) {
+                $totalVal  = (float)$existingCobrar['total'];
+                $pagadoReq = isset($doc['pagado']) ? (float)$doc['pagado'] : null;
+                $impagoReq = isset($doc['impago']) ? (float)$doc['impago'] : null;
+
+                if ($nuevoEstado === 'parcial') {
+                    $pagadoVal = ($pagadoReq !== null) ? $pagadoReq : (float)($existingCobrar['pagado'] ?? 0);
+                    $impagoVal = ($impagoReq !== null) ? $impagoReq : max(0, $totalVal - $pagadoVal);
+                } else if ($esPagada) {
+                    $pagadoVal = $totalVal;
+                    $impagoVal = 0.00;
+                } else {
+                    $pagadoVal = 0.00;
+                    $impagoVal = $totalVal;
+                }
+
+                $db->table('tbl_documentos_cobrar')->where('id', $existingCobrar['id'])->update([
+                    'pagado'     => $pagadoVal,
+                    'impago'     => $impagoVal,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            }
+
+            // 2. Actualizar tbl_facto_pagos (solo si existe la tabla)
+            if ($db->tableExists('tbl_facto_pagos')) {
+                $estadoFacto  = ($nuevoEstado === 'parcial') ? 'parcial' : ($esPagada ? 'pagada' : 'pendiente');
+                $obsFacto     = ($nuevoEstado === 'parcial') ? 'Abono Parcial registrado' : ($esPagada ? 'Pagada desde Cuentas por Cobrar' : 'Reactivado a Pendiente');
+                $montoPagadoFacto = ($nuevoEstado === 'parcial') ? $pagadoVal : ($esPagada ? (float)($existingCobrar['total'] ?? 0) : 0.00);
+
+                $sqlFacto = "UPDATE `tbl_facto_pagos` 
+                             SET `estado_pago` = ?, 
+                                 `monto_pagado` = ?, 
+                                 `observacion` = ?, 
+                                 `updated_at` = CURRENT_TIMESTAMP
+                             WHERE (`folio` = ? OR `folio` = ? OR TRIM(LEADING '0' FROM `folio`) = ?);";
+                $db->query($sqlFacto, [$estadoFacto, $montoPagadoFacto, $obsFacto, $folioRaw, $folioClean, $folioClean]);
+            }
+
+            $updatedCount++;
+        }
+
+        $db->transComplete();
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Se actualizaron {$updatedCount} documento(s) correctamente.",
+            'count'   => $updatedCount
         ]);
     }
 
@@ -615,7 +594,8 @@ class FactoController extends BaseController
             }
 
             $folioClean = ltrim($folioRaw, '0');
-            $rutCliente = trim((string)($doc['cliente_rut'] ?? ''));
+            $rutRaw     = trim((string)($doc['cliente_rut'] ?? ''));
+            $rutCliente = !empty($rutRaw) ? $this->formatRut($rutRaw) : '';
             $nombreCliente = trim((string)($doc['cliente_nombre'] ?? 'Cliente Facto'));
             $codigoSii = (int)($doc['codigo_sii'] ?? 33);
             $fecha = trim((string)($doc['fecha'] ?? date('Y-m-d')));
@@ -625,7 +605,10 @@ class FactoController extends BaseController
 
             // 1. Asegurar registro del cliente en tbl_clientes si no existe
             if (!empty($rutCliente)) {
-                $existCliente = $db->table('tbl_clientes')->where('rut', $rutCliente)->get()->getRowArray();
+                $qCliente = $db->table('tbl_clientes')
+                                   ->where('rut', $rutCliente)
+                                   ->get();
+                $existCliente = ($qCliente && is_object($qCliente)) ? $qCliente->getRowArray() : null;
                 if (!$existCliente) {
                     $db->table('tbl_clientes')->insert([
                         'nombre' => $nombreCliente,
@@ -636,22 +619,29 @@ class FactoController extends BaseController
                 }
             }
 
-            // 2. Insertar / Actualizar en tbl_documentos_cobrar
-            $existing = $db->table('tbl_documentos_cobrar')->where('numero', $folioClean)->get()->getRowArray();
+            // 2. Insertar / Actualizar en tbl_documentos_cobrar (coincidencia por folio exacto o limpio)
+            $qExisting = $db->table('tbl_documentos_cobrar')
+                           ->groupStart()
+                               ->where('numero', $folioRaw)
+                               ->orWhere('numero', $folioClean)
+                           ->groupEnd()
+                           ->get();
+            $existing  = ($qExisting && is_object($qExisting)) ? $qExisting->getRowArray() : null;
+
             if ($existing) {
                 $db->table('tbl_documentos_cobrar')->where('id', $existing['id'])->update([
                     'rut_cliente'    => $rutCliente,
                     'tipo_documento' => $tipoNombre,
                     'fecha'          => $fecha,
                     'total'          => $total,
-                    'impago'         => $total,
+                    'impago'         => $total - (float)($existing['pagado'] ?? 0),
                     'updated_at'     => date('Y-m-d H:i:s')
                 ]);
             } else {
                 $db->table('tbl_documentos_cobrar')->insert([
                     'rut_cliente'    => $rutCliente,
                     'tipo_documento' => $tipoNombre,
-                    'numero'         => $folioClean,
+                    'numero'         => $folioRaw,
                     'fecha'          => $fecha,
                     'total'          => $total,
                     'pagado'         => 0.00,
@@ -661,14 +651,19 @@ class FactoController extends BaseController
                 ]);
             }
 
-            // 3. Registrar en tbl_facto_pagos en estado 'pendiente'
-            $sqlFacto = "INSERT INTO `tbl_facto_pagos` (`folio`, `codigo_sii`, `estado_pago`, `monto_pagado`, `observacion`)
-                         VALUES (?, ?, 'pendiente', 0.00, 'Cuentas por Cobrar (Deuda Impaga)')
+            // 3. Registrar / Actualizar en tbl_facto_pagos en estado 'pendiente'
+            $sqlFacto = "INSERT INTO `tbl_facto_pagos` (`folio`, `codigo_sii`, `rut_cliente`, `razon_social`, `monto_total`, `fecha_emision`, `estado_sii`, `estado_pago`, `monto_pagado`, `observacion`)
+                         VALUES (?, ?, ?, ?, ?, ?, 'Aceptado', 'pendiente', 0.00, 'Cuentas por Cobrar (Deuda Impaga)')
                          ON DUPLICATE KEY UPDATE 
+                           `rut_cliente` = VALUES(`rut_cliente`),
+                           `razon_social` = VALUES(`razon_social`),
+                           `monto_total` = VALUES(`monto_total`),
+                           `fecha_emision` = VALUES(`fecha_emision`),
                            `estado_pago` = 'pendiente',
                            `monto_pagado` = 0.00,
+                           `observacion` = VALUES(`observacion`),
                            `updated_at` = CURRENT_TIMESTAMP";
-            $db->query($sqlFacto, [$folioClean, $codigoSii]);
+            $db->query($sqlFacto, [$folioClean, $codigoSii, $rutCliente, $nombreCliente, $total, $fecha]);
 
             $importedCount++;
         }
@@ -704,7 +699,7 @@ class FactoController extends BaseController
         $username = env('FACTO_USERNAME') ?: '77775829-2/5634';
         $password = env('FACTO_PASSWORD') ?: '1de8af70e35aa7e0d2c7b6d4750cad25';
 
-        $authUrl = "https://api-billing.koywe.com/V1/auth";
+        $authUrl = "https://api.facto.cl/auth";
         $authBody = [
             "grant_type" => "password",
             "client_id" => $clientId,
@@ -743,23 +738,85 @@ class FactoController extends BaseController
     /**
      * Mapeo de nombres descriptivos de DTE SII
      */
-    private function getTipoDteNombre(int $code): string
+    private function getTipoDteNombre(int $codigoSii): string
     {
-        switch ($code) {
-            case 33:
-                return 'Factura Electrónica';
-            case 34:
-                return 'Factura Exenta Electrónica';
-            case 39:
-                return 'Boleta Electrónica';
-            case 52:
-                return 'Guía de Despacho Electrónica';
-            case 61:
-                return 'Nota de Crédito Electrónica';
-            case 56:
-                return 'Nota de Débito Electrónica';
-            default:
-                return 'DTE (' . $code . ')';
+        switch ($codigoSii) {
+            case 33: return 'Factura Electrónica';
+            case 39: return 'Boleta Electrónica';
+            case 52: return 'Guía de Despacho Electrónica';
+            case 61: return 'Nota de Crédito Electrónica';
+            case 56: return 'Nota de Débito Electrónica';
+            default: return 'Documento DTE (' . $codigoSii . ')';
         }
+    }
+
+    private function formatRut(string $rut): string
+    {
+        $clean = preg_replace('/[^0-9kK]/', '', $rut);
+        if (strlen($clean) < 2) return $rut;
+        $body = substr($clean, 0, -1);
+        $dv   = strtoupper(substr($clean, -1));
+        return $body . '-' . $dv;
+    }
+
+    /**
+     * GET /ejecutar-migracion-db-prod?token=sync2026
+     * Importa local_admin.sql a la base de datos de producción desde el propio CodeIgniter
+     */
+    public function ejecutarMigracionDb(): ResponseInterface
+    {
+        $token = $this->request->getGet('token');
+        if ($token !== 'sync2026') {
+            return $this->response->setStatusCode(403)->setJSON(['success' => false, 'message' => 'Acceso denegado']);
+        }
+
+        $db = \Config\Database::connect();
+        $db->query("SET FOREIGN_KEY_CHECKS = 0;");
+        $db->query("DROP TABLE IF EXISTS tbl_productos_reservas, tbl_listaprecios, tbl_abonos_pagar, tbl_documentos_pagar, tbl_documentos_cobrar, tbl_caja_movimientos, tbl_cajas, tbl_productos, tbl_clientes, tbl_proveedores, tbl_funcionarios, tbl_perfiles, tbl_users, tbl_usuarios, tbl_facto_pagos, tbl_notificaciones;");
+
+        $sqlPath = FCPATH . 'local_admin.sql';
+        if (!file_exists($sqlPath)) {
+            $sqlPath = ROOTPATH . 'local_admin.sql';
+        }
+
+        if (!file_exists($sqlPath)) {
+            return $this->response->setStatusCode(404)->setJSON(['success' => false, 'message' => 'local_admin.sql no encontrado en ' . $sqlPath]);
+        }
+
+        $lines = file($sqlPath);
+        $query = '';
+        $count = 0;
+        $errors = [];
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if (substr($trimmed, 0, 2) == '--' || $trimmed == '' || substr($trimmed, 0, 2) == '/*') {
+                continue;
+            }
+            $query .= $line;
+            if (substr($trimmed, -1) == ';') {
+                try {
+                    if (!$db->query($query)) {
+                        $errors[] = "Error SQL";
+                    } else {
+                        $count++;
+                    }
+                } catch (\Throwable $e) {
+                    $errors[] = $e->getMessage();
+                }
+                $query = '';
+            }
+        }
+
+        $db->query("SET FOREIGN_KEY_CHECKS = 1;");
+        @unlink($sqlPath);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Sincronización de base de datos completada con éxito. {$count} consultas ejecutadas.",
+            'queries_count' => $count,
+            'errors_count'  => count($errors),
+            'errors'        => array_slice($errors, 0, 5)
+        ]);
     }
 }

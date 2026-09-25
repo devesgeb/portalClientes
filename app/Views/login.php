@@ -226,14 +226,16 @@
     <div class="login-title">Bienvenido</div>
     <div class="login-sub">Ingresa tus credenciales para continuar</div>
 
-    <!-- Alerta de error (flash) -->
-    <?php $loginError = session()->getFlashdata('login_error'); ?>
-    <?php if ($loginError): ?>
-    <div class="login-error" id="errorAlert">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <span><?= esc($loginError) ?></span>
+    <!-- Contenedor de Alertas / Error -->
+    <div id="errorContainer">
+        <?php $loginError = session()->getFlashdata('login_error'); ?>
+        <?php if ($loginError): ?>
+        <div class="login-error" id="errorAlert">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <span><?= esc($loginError) ?></span>
+        </div>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 
     <!-- Formulario -->
     <form id="loginForm" method="post" action="<?= site_url('home/validaUser') ?>" onsubmit="iniciarLogin(event)">
@@ -288,53 +290,26 @@ function togglePassword() {
     }
 }
 
-/* ── Loading al hacer submit ─────────────────────────────────── */
+/* ── Indicador visual al enviar formulario ──────────────────── */
 function iniciarLogin(e) {
-    const usuario = document.getElementById('inputUsuario').value.trim();
-    const clave   = document.getElementById('inputClave').value.trim();
+    const usuarioInput = document.getElementById('inputUsuario');
+    const claveInput   = document.getElementById('inputClave');
+    const usuario      = usuarioInput ? usuarioInput.value.trim() : '';
+    const clave        = claveInput   ? claveInput.value.trim()   : '';
 
-    if (!usuario || !clave) return; // dejar que HTML5 maneje el required
+    if (!usuario || !clave) return;
 
-    // Mostrar overlay
+    // Mostrar animación visual de carga sin bloquear el envío nativo del formulario POST
     const overlay = document.getElementById('loadingOverlay');
     const bar     = document.getElementById('loadingBar');
     const subText = document.getElementById('loadingSubText');
-    const btn     = document.getElementById('btnLogin');
 
-    overlay.classList.add('show');
-    btn.disabled = true;
-
-    // Textos progresivos
-    const pasos = [
-        { pct: 20, txt: 'Conectando al servidor...' },
-        { pct: 45, txt: 'Verificando usuario...' },
-        { pct: 70, txt: 'Comprobando permisos...' },
-        { pct: 90, txt: 'Cargando tu perfil...' },
-        { pct: 99, txt: 'Preparando el panel...' },
-    ];
-
-    let i = 0;
-    const intervalo = setInterval(() => {
-        if (i < pasos.length) {
-            bar.style.width     = pasos[i].pct + '%';
-            subText.textContent = pasos[i].txt;
-            i++;
-        } else {
-            clearInterval(intervalo);
-        }
-    }, 600); // cada 600ms → ~3 segundos en total antes de que el form haga el POST
-
-    // Delay de 3 seg antes de enviar el form
-    e.preventDefault();
-    setTimeout(() => {
-        clearInterval(intervalo);
-        bar.style.width = '100%';
-        subText.textContent = 'Redirigiendo...';
-        setTimeout(() => document.getElementById('loginForm').submit(), 300);
-    }, 3000);
+    if (overlay) overlay.classList.add('show');
+    if (bar) bar.style.width = '100%';
+    if (subText) subText.textContent = 'Iniciando sesión...';
 }
 
-/* ── Auto-ocultar error después de 6 seg ────────────────────── */
+/* ── Auto-ocultar error inicial si existe ───────────────────── */
 const alertaError = document.getElementById('errorAlert');
 if (alertaError) {
     setTimeout(() => {

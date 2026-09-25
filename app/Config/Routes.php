@@ -17,7 +17,6 @@ $routes->get('/intranet', 'Home::index');
 
 // Para la validación del formulario
 $routes->post('/home/validaUser', 'Home::validaUser');
-// O también puedes usar:
 $routes->post('/validaUser', 'Home::validaUser');
 
 // Dashboard después del login
@@ -42,23 +41,12 @@ $routes->get('/historial-balances', 'ContabilidadController::historialBalances')
 $routes->get('/cuentas-cobrar/pendientes', 'BalanceDiario::pendientesCobrar');
 $routes->post('/cuentas-cobrar/sincronizar', 'BalanceDiario::sincronizarCobrar');
 $routes->delete('/cuentas-cobrar/eliminar', 'BalanceDiario::eliminarCobrar');
-// Verificar si N° documento existe
 $routes->get('/cuentas-cobrar/verificar-documento', 'BalanceDiario::verificarDocumento');
 
 // ── Cuentas por Pagar (API JSON)
 $routes->get('/cuentas-pagar/pendientes', 'BalanceDiario::pendientesPagar');
 $routes->post('/cuentas-pagar/sincronizar', 'BalanceDiario::sincronizarPagar');
 $routes->delete('/cuentas-pagar/eliminar', 'BalanceDiario::eliminarPagar');
-// Verificar si N° documento existe en Pagar
-$routes->get('/cuentas-pagar/verificar-documento', 'BalanceDiario::verificarDocumentoPagar');
-// Abonos por documento
-$routes->get('/cuentas-pagar/abonos',              'BalanceDiario::listarAbonos');
-$routes->post('/cuentas-pagar/abonos',             'BalanceDiario::registrarAbono');
-$routes->delete('/cuentas-pagar/abonos/(:num)',    'BalanceDiario::eliminarAbono/$1');
-$routes->patch('/cuentas-pagar/comentario-doc',    'BalanceDiario::actualizarComentarioDoc');
-
-
-
 
 // ── Panel de Administración
 $routes->get('/admin', 'AdminController::index');
@@ -78,6 +66,7 @@ $routes->get('/usuarios/lista',        'UsuariosController::lista');
 $routes->post('/usuarios/guardar',     'UsuariosController::guardar');
 $routes->delete('/usuarios/eliminar/(:num)', 'UsuariosController::eliminar/$1');
 $routes->patch('/usuarios/toggle-estado/(:num)', 'UsuariosController::toggleEstado/$1');
+
 // ── Cargar Clientes / Proveedores
 $routes->get('/cargar-entidad', 'CargarEntidadController::index');
 $routes->post('/importar-clientes', 'CargarEntidadController::importarClientes');
@@ -90,11 +79,25 @@ $routes->get('/buscar-entidad/detalle', 'BuscarEntidadController::detalle');
 $routes->put('/buscar-entidad/actualizar', 'BuscarEntidadController::actualizar');
 $routes->delete('/buscar-entidad/eliminar', 'BuscarEntidadController::eliminar');
 
-// Autocomplete clientes / proveedores
+// Autocomplete clientes / proveedores & inventario
 $routes->get('/clientes/buscar', 'BalanceDiario::buscarClientes');
 $routes->post('/clientes/buscar-por-ruts', 'BalanceDiario::buscarClientesPorRuts');
 $routes->get('/proveedores/buscar', 'BalanceDiario::buscarProveedores');
 $routes->get('/inventario/productos', 'BalanceDiario::inventarioProductos');
+
+// Cuentas por Pagar & Abonos (Balance Diario)
+$routes->get('/cuentas-pagar/pendientes', 'BalanceDiario::pendientesPagar');
+$routes->post('/cuentas-pagar/sincronizar', 'BalanceDiario::sincronizarPagar');
+$routes->delete('/cuentas-pagar/eliminar', 'BalanceDiario::eliminarPagar');
+$routes->get('/cuentas-pagar/verificar-documento', 'BalanceDiario::verificarDocumentoPagar');
+$routes->get('/cuentas-pagar/abonos', 'BalanceDiario::listarAbonos');
+$routes->post('/cuentas-pagar/abonos', 'BalanceDiario::registrarAbono');
+$routes->delete('/cuentas-pagar/abonos/(:num)', 'BalanceDiario::eliminarAbono/$1');
+
+// Cuentas por Cobrar
+$routes->get('/cuentas-cobrar/pendientes', 'BalanceDiario::pendientesCobrar');
+$routes->get('/cuentas-cobrar/verificar-documento', 'BalanceDiario::verificarDocumento');
+$routes->delete('/cuentas-cobrar/eliminar', 'BalanceDiario::eliminarCobrar');
 
 // ── Webhooks Tu Pana & Simulador ───────────────────────────────
 $routes->get('/webhook-test', 'WebhookReceiver::index');
@@ -106,10 +109,15 @@ $routes->post('/webhook/tupana', 'WebhookReceiver::receive');
 // ── Cobranza / Documentos Ventas (Facto API Ventas) ──────────────
 $routes->get('/cobranza/documentos-impago',          'WebhookReceiver::documentosImpago');
 $routes->get('/cobranza/facturas-facto',             'FactoController::facturasFacto');
+$routes->get('/facturacion/importar/ventas',          'FactoController::facturasFacto');
 $routes->get('/cobranza/facto/buscar-dtes',           'FactoController::buscarDtes');
 $routes->post('/cobranza/facto/actualizar-estado-pago', 'FactoController::actualizarEstadoPago');
 $routes->post('/cobranza/facto/actualizar-estado-masivo', 'FactoController::actualizarEstadoMasivo');
 $routes->post('/cobranza/facto/importar-a-cobrar',     'FactoController::importarACobrar');
+$routes->post('/cobranza/facto/marcar-pagadas-desde-cobrar', 'FactoController::marcarPagadasDesdeCobrar');
+$routes->post('/cuentas-cobrar/marcar-pagadas-desde-cobrar', 'FactoController::marcarPagadasDesdeCobrar');
+$routes->post('/cobranza/facto/actualizar-estado-flujo', 'FactoController::actualizarEstadoFlujo');
+$routes->get('/ejecutar-migracion-db-prod', 'FactoController::ejecutarMigracionDb');
 
 // ── Cobranza / Manejo de Caja
 $routes->get('/cobranza/manejo-caja',          'ManejoCajaController::index');
@@ -139,6 +147,7 @@ $routes->get('/logistica/api/funcionarios/(:num)/eventos',   'LogisticaControlle
 $routes->post('/logistica/api/funcionarios/(:num)/eventos',  'LogisticaController::crearEvento/$1');
 $routes->delete('/logistica/api/eventos/(:num)',              'LogisticaController::eliminarEvento/$1');
 
+// ── Bodega & Productos ───────────────
 $routes->get('/productos',                         'BodegaController::productos');
 $routes->get('/bodega/lista-productos',            'BodegaController::listarProductos');
 $routes->get('/bodega/producto/(:any)',             'BodegaController::getProducto/$1');
@@ -154,3 +163,22 @@ $routes->post('/bodega/importar-lista-precios',    'BodegaController::importarLi
 $routes->get('/bodega/plantilla-productos',        'BodegaController::plantillaProductos');
 $routes->get('/bodega/plantilla-lista-precios',    'BodegaController::plantillaListaPrecios');
 $routes->get('/bodega/stats',                      'BodegaController::stats');
+
+// ── Prototipo Facto Productos, Precios y Stock ──
+$routes->get('/bodega/facto-productos',            'BodegaController::factoProductos');
+$routes->get('/bodega/facto-productos/listar',     'BodegaController::listarFactoProductos');
+$routes->get('/bodega/facto-productos/exportar-pdf', 'BodegaController::exportarCatalogoPdf');
+
+
+// ── Cron Sincronización Facto API ──
+$routes->get('/cron/sync-facto',                   'CronController::syncFacto');
+$routes->cli('/cron/sync-facto',                   'CronController::syncFacto');
+$routes->get('/cron/sync-facto-productos',         'CronController::syncFactoProductos');
+$routes->cli('/cron/sync-facto-productos',         'CronController::syncFactoProductos');
+
+// ── Webhook Receptor & Monitor (WooCommerce / Facto) ──
+$routes->get('/webhook/monitor',                   'WebhookController::monitor');
+$routes->post('/webhook/receiver',                 'WebhookController::receiver');
+$routes->get('/webhook/logs-json',                 'WebhookController::getLogsJson');
+$routes->post('/webhook/test-simular',             'WebhookController::testSimular');
+$routes->delete('/webhook/limpiar-logs',           'WebhookController::limpiarLogs');

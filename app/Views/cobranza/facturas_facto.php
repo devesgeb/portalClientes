@@ -201,15 +201,15 @@
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card card-stats h-100 shadow-sm">
+                <div class="card card-stats h-100 shadow-sm border-warning-subtle" style="background:#fffbeb;">
                     <div class="card-body d-flex align-items-center gap-3">
-                        <div class="p-3 bg-info-subtle text-info rounded-4" style="font-size: 1.5rem;">
-                            <i class="bi bi-cloud-check-fill"></i>
+                        <div class="p-3 bg-warning-subtle text-warning rounded-4" style="font-size: 1.5rem;">
+                            <i class="bi bi-clock-history"></i>
                         </div>
                         <div>
-                            <div class="text-muted fs-7 fw-medium text-uppercase">Conexión Facto API</div>
-                            <h4 class="fw-bold mb-0 text-slate-800" style="font-size: 1.1rem;">Koywe Billing API</h4>
-                            <span class="badge bg-success-subtle text-success font-monospace" style="font-size:0.7rem;">RUT: 77.775.829-2</span>
+                            <div class="text-warning-emphasis fs-7 fw-bold text-uppercase">Monto Pendiente Flujo</div>
+                            <h4 class="fw-bold mb-0 text-slate-900" id="statTotalPendienteFlujo">$0</h4>
+                            <span class="badge bg-warning text-dark font-monospace mt-1" style="font-size:0.7rem;" id="statCountPendienteFlujo">0 docs pendientes</span>
                         </div>
                     </div>
                 </div>
@@ -333,7 +333,7 @@
                             <th class="text-end">Neto</th>
                             <th class="text-end">IVA</th>
                             <th class="text-end">Total</th>
-                            <th class="text-center">Estado SII</th>
+                            <th class="text-center" style="width: 130px;">Estado Flujo</th>
                             <th class="text-center" style="width: 140px;">Estado de Pago</th>
                         </tr>
                     </thead>
@@ -387,13 +387,7 @@
                         <span class="text-slate-800 font-monospace fw-bold" style="font-size:0.92rem;" id="modalImportTotalMonto">Total Seleccionado: $0</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <label class="form-label mb-0 fw-semibold text-slate-600" style="font-size: 0.8rem;">Filtrar Estado:</label>
-                        <select id="modalEstadoFilter" class="form-select form-select-sm fw-medium" style="width: 215px;" onchange="filtrarModalDocs()">
-                            <option value="todos">🌐 Todos los Estados</option>
-                            <option value="pendiente" selected>🟡 Pendientes por Cargar</option>
-                            <option value="cobranza">🟢 Ya en Cobranza</option>
-                        </select>
-                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3 ms-2" onclick="toggleModalCheckAllMaster(this)">
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" onclick="toggleModalCheckAllMaster(this)">
                             <i class="bi bi-check2-all me-1"></i> Marcar / Desmarcar
                         </button>
                     </div>
@@ -514,6 +508,7 @@
                 document.getElementById('countBadge').textContent = `${totalCount} documentos`;
                 document.getElementById('statTotalCount').textContent = totalCount;
                 document.getElementById('statTotalMonto').textContent = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(currentFactoTotalMonto);
+                actualizarStatsPendienteFlujo();
 
                 // Renderizar primera página desde el arreglo local en memoria
                 renderFactoPage(1);
@@ -522,6 +517,7 @@
                 document.getElementById('countBadge').textContent = `0 documentos`;
                 document.getElementById('statTotalCount').textContent = '0';
                 document.getElementById('statTotalMonto').textContent = '$0';
+                actualizarStatsPendienteFlujo();
                 
                 let message = 'No se encontraron documentos en Facto API.';
                 if (res.message) {
@@ -561,6 +557,14 @@
             else if (d.codigo_sii === 61) badgeClass = 'bg-danger-subtle text-danger border border-danger-subtle';
 
             const stClass = d.estado_pago || 'pendiente';
+            const esCargado = d.estado_flujo === 'cargado';
+            const flujoBadge = `
+                <select class="form-select form-select-sm fw-bold ${esCargado ? 'bg-success-subtle text-success border-success-subtle' : 'bg-warning-subtle text-warning border-warning-subtle'}" 
+                        style="font-size:0.75rem;padding:2px 6px;border-radius:6px;min-width:115px;" 
+                        onchange="actualizarEstadoFlujoIndividual('${d.folio}', ${d.codigo_sii}, this.value, this)">
+                    <option value="pendiente" ${!esCargado ? 'selected' : ''}>🟡 Pendiente</option>
+                    <option value="cargado" ${esCargado ? 'selected' : ''}>🟢 Cargado</option>
+                </select>`;
             
             return `
             <tr>
@@ -577,9 +581,7 @@
                 <td class="text-end fw-medium text-slate-600">${netoFmt}</td>
                 <td class="text-end fw-medium text-slate-600">${ivaFmt}</td>
                 <td class="text-end fw-bold text-dark">${totalFmt}</td>
-                <td class="text-center">
-                    <span class="badge ${d.estado_sii === 'Aceptado' ? 'bg-success-subtle text-success border border-success' : 'bg-warning-subtle text-warning border border-warning'}">${d.estado_sii}</span>
-                </td>
+                <td class="text-center">${flujoBadge}</td>
                 <td class="text-center">
                     <select class="form-select form-select-sm status-select ${stClass}" onchange="cambiarEstadoIndividual('${d.folio}', ${d.codigo_sii}, this.value, this)">
                         <option value="pendiente" ${stClass === 'pendiente' ? 'selected' : ''}>🔴 Pendiente</option>
@@ -655,6 +657,50 @@
             selectedCountText.textContent = `${selected.length} documento${selected.length > 1 ? 's' : ''} seleccionado${selected.length > 1 ? 's' : ''}`;
         } else {
             bulkBar.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    function actualizarStatsPendienteFlujo() {
+        const pendientes = allFactoDocs.filter(d => d.estado_flujo === 'pendiente');
+        const count = pendientes.length;
+        const total = pendientes.reduce((sum, d) => sum + (parseFloat(d.total) || 0), 0);
+
+        const totalFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(total);
+        const elMonto = document.getElementById('statTotalPendienteFlujo');
+        const elBadge = document.getElementById('statCountPendienteFlujo');
+
+        if (elMonto) elMonto.textContent = totalFmt;
+        if (elBadge) elBadge.textContent = `${count} doc${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`;
+    }
+
+    // ── Actualización Individual de Estado Flujo ────────────────
+    async function actualizarEstadoFlujoIndividual(folio, codigoSii, nuevoEstado, selectElem) {
+        if (selectElem) {
+            selectElem.className = `form-select form-select-sm fw-bold ${nuevoEstado === 'cargado' ? 'bg-success-subtle text-success border-success-subtle' : 'bg-warning-subtle text-warning border-warning-subtle'}`;
+        }
+        try {
+            const response = await fetch(baseUrl + 'cobranza/facto/actualizar-estado-flujo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folio: folio,
+                    codigo_sii: codigoSii,
+                    estado_flujo: nuevoEstado
+                })
+            });
+            const res = await response.json();
+            if (res.success) {
+                mostrarToast(res.message || `Folio ${folio} actualizado a ${nuevoEstado}`, 'success');
+                const found = allFactoDocs.find(x => String(x.folio) === String(folio) && parseInt(x.codigo_sii) === parseInt(codigoSii));
+                if (found) {
+                    found.estado_flujo = nuevoEstado;
+                    actualizarStatsPendienteFlujo();
+                }
+            } else {
+                mostrarToast(res.message || 'Error al actualizar estado de flujo', 'danger');
+            }
+        } catch (e) {
+            mostrarToast('Error al conectar con el servidor', 'danger');
         }
     }
 
@@ -740,9 +786,8 @@
 
         const tbody = document.getElementById('modalImportBody');
         
-        // Consultar siempre la API al abrir para obtener los DTEs más recientes de hoy
         modalDocsData = [];
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-success"></span>Cargando DTEs desde Facto API...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5"><span class="spinner-border spinner-border-sm me-2 text-success"></span>Cargando DTEs pendientes por trasladar...</td></tr>`;
         try {
             const response = await fetch(baseUrl + 'cobranza/facto/buscar-dtes?estado_pago=pendiente');
             const res = await response.json();
@@ -759,45 +804,30 @@
         renderModalDocs();
     }
 
-    function filtrarModalDocs() {
-        renderModalDocs();
-    }
-
     function renderModalDocs() {
         const tbody = document.getElementById('modalImportBody');
-        const filterVal = document.getElementById('modalEstadoFilter') ? document.getElementById('modalEstadoFilter').value : 'pendiente';
 
         if (modalDocsData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">No hay DTEs disponibles.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">No existen DTEs pendientes disponibles para cargar.</td></tr>`;
             document.getElementById('modalImportCountBadge').textContent = '0 seleccionados';
             document.getElementById('modalImportTotalMonto').textContent = 'Total Seleccionado: $0';
             return;
         }
 
-        // Filtrado ultrarrápido en memoria JS del cliente (0 ms)
-        let filtered = modalDocsData.filter(d => {
-            const obs = d.observacion || '';
-            if (filterVal === 'pendiente') {
-                return obs.includes('Pendiente por Cargar');
-            } else if (filterVal === 'cobranza') {
-                return obs.includes('Cuentas por Cobrar');
-            }
-            return true; // 'todos'
-        });
+        // Regla solicitada:
+        // Cargar ÚNICAMENTE los documentos que cumplan AMBAS condiciones:
+        // 1. Estado Flujo: 'pendiente' (No cargado en Cuentas por Cobrar)
+        // 2. Y Estado de Pago: 'pendiente' (Deuda impaga)
+        let filtered = modalDocsData.filter(d => d.estado_flujo === 'pendiente' && d.estado_pago === 'pendiente');
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">No se encontraron DTEs para el filtro "${filterVal}".</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted"><i class="bi bi-check-circle-fill text-success fs-4 d-block mb-2"></i>No hay documentos pendientes (Estado Flujo: Pendiente y Estado Pago: Pendiente) por trasladar.</td></tr>`;
             actualizarSeleccionModal();
             return;
         }
 
-        // Ordenar: Los DTEs "Pendiente por Cargar" al inicio, y secundariamente por FECHA DESCENDENTE (lo más reciente de HOY arriba)
-        filtered.sort((a, b) => {
-            const isAPend = (a.observacion || '').includes('Pendiente por Cargar') ? 0 : 1;
-            const isBPend = (b.observacion || '').includes('Pendiente por Cargar') ? 0 : 1;
-            if (isAPend !== isBPend) return isAPend - isBPend;
-            return (b.fecha || '').localeCompare(a.fecha || '');
-        });
+        // Ordenar por FECHA DESCENDENTE
+        filtered.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
 
         tbody.innerHTML = filtered.map((d) => {
             const indexInMaster = modalDocsData.findIndex(x => String(x.folio) === String(d.folio) && parseInt(x.codigo_sii) === parseInt(d.codigo_sii));
@@ -808,17 +838,12 @@
             else if (d.codigo_sii === 52) badgeClass = 'bg-warning-subtle text-warning border border-warning-subtle';
             else if (d.codigo_sii === 39) badgeClass = 'bg-success-subtle text-success border border-success-subtle';
 
-            const esPendienteCarga = (d.observacion || '').includes('Pendiente por Cargar');
-            const isChecked = esPendienteCarga ? 'checked' : '';
-            
-            const estadoBadge = esPendienteCarga
-                ? `<span class="badge bg-warning-subtle text-dark border border-warning fw-bold"><i class="bi bi-clock-history me-1"></i>Pendiente por Cargar</span>`
-                : `<span class="badge bg-success-subtle text-success border border-success fw-bold"><i class="bi bi-check-circle me-1"></i>Ya en Cobranza</span>`;
+            const estadoBadge = `<span class="badge bg-warning-subtle text-dark border border-warning fw-bold"><i class="bi bi-clock-history me-1"></i>Pendiente por Cargar</span>`;
 
             return `
-            <tr class="${esPendienteCarga ? 'table-warning bg-warning-subtle' : ''}">
+            <tr class="table-warning bg-warning-subtle">
                 <td class="text-center">
-                    <input type="checkbox" class="form-check-input modal-doc-checkbox" data-index="${indexInMaster}" ${isChecked} onclick="actualizarSeleccionModal()">
+                    <input type="checkbox" class="form-check-input modal-doc-checkbox" data-index="${indexInMaster}" checked onclick="actualizarSeleccionModal()">
                 </td>
                 <td class="fw-bold">${d.folio}</td>
                 <td>${d.fecha}</td>

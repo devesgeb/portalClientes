@@ -119,9 +119,9 @@ window.DocumentosModule = (function () {
                 <td class="text-end" style="font-weight:700;">${PortalApp.fmt(r.monto || 0)}</td>
                 <td class="text-center">
                     <div class="d-flex gap-1 justify-content-center">
-                        <button class="btn-act det"  title="Ver detalle"       onclick="DocumentosModule.verDetalle(window._CFG_${cfg.tipo.toUpperCase()},${r.id})"><i class="bi bi-eye"></i></button>
-                        <button class="btn-act edit" title="Editar"            onclick="DocumentosModule._abrirEditarWrap('${cfg.tipo}',${r.id})"><i class="bi bi-pencil"></i></button>
-                        <button class="btn-act del"  title="Eliminar"          onclick="DocumentosModule.eliminar(window._CFG_${cfg.tipo.toUpperCase()},${r.id})"><i class="bi bi-trash3"></i></button>
+                        <button class="btn-act det"  title="Ver detalle"       onclick="DocumentosModule.verDetalle(window._CFG_${cfg.tipo.toUpperCase()},'${r.id}')"><i class="bi bi-eye"></i></button>
+                        <button class="btn-act edit" title="Editar"            onclick="DocumentosModule._abrirEditarWrap('${cfg.tipo}','${r.id}')"><i class="bi bi-pencil"></i></button>
+                        <button class="btn-act del"  title="Eliminar"          onclick="DocumentosModule.eliminar(window._CFG_${cfg.tipo.toUpperCase()},'${r.id}')"><i class="bi bi-trash3"></i></button>
                     </div>
                 </td>`;
                 tbody.appendChild(tr);
@@ -353,33 +353,92 @@ window.DocumentosModule = (function () {
 
     function _renderDetalleBody(cfg, id, body) {
         if (!body) return;
-        const r = cfg.db().find(x => x.id === id);
+        const r = cfg.db().find(x => String(x.id) === String(id));
         if (!r) return;
         const nombre = r.nombre || r.cliente || r.proveedor || '—';
         const docs = r.docs || [];
         const color = cfg.color;
+        const isPagar = (cfg.tipo === 'pagar');
 
         const docsRows = docs.length
-            ? docs.map((d, idx) => `
-                <tr>
-                    <td style="padding:6px 10px;">
-                        <span class="badge" style="background:#eff6ff;color:#2563eb;font-size:.72rem;">${d.tipo || 'Sin tipo'}</span>
-                    </td>
-                    <td style="padding:6px 10px;font-size:.78rem;font-weight:500;">${d.nro || d.numero || '—'}</td>
-                    <td style="padding:6px 10px;font-size:.76rem;color:#64748b;">${d.fecha || '—'}</td>
-                    <td style="padding:6px 10px;text-align:right;color:#2563eb;font-weight:700;">${PortalApp.fmt(d.monto ?? d.total ?? 0)}</td>
+            ? docs.map((d, idx) => {
+                const isPagar = (cfg.tipo === 'pagar');
+                const docId = d.id || 0;
+                const folioDoc = d.nro || d.numero || '—';
+                const totalMontoDoc = parseFloat(d.monto ?? d.total ?? 0);
+                const pagadoDoc = parseFloat(d.pagado ?? 0);
+                const impagoDoc = parseFloat(d.impago ?? (totalMontoDoc - pagadoDoc));
+
+                const abonoBtn = isPagar
+                    ? `<button onclick="DocumentosModule.abrirModalAbonoPagar(${docId}, '${folioDoc}', ${totalMontoDoc}, ${impagoDoc})"
+                        title="Registrar abono de dinero a este documento"
+                        class="btn btn-sm btn-outline-warning py-0 px-2 font-semibold me-1"
+                        style="font-size:0.75rem;border-radius:6px;"
+                       ><i class="bi bi-cash-coin me-1"></i>Abonar</button>`
+                    : '';
+
+                const tipoLower = (d.tipo || '').toLowerCase();
+                const esFacturaOBoleta = tipoLower.includes('factura') || tipoLower.includes('boleta');
+
+                const abonoCobrarBtn = (!isPagar && esFacturaOBoleta)
+                    ? `<button onclick="DocumentosModule.abrirAbonoCobrarPrompt(window._CFG_${cfg.tipo.toUpperCase()}, '${id}', ${idx})"
+                        title="Ingresar Abono"
+                        class="btn btn-sm btn-outline-warning py-0 px-2 font-semibold me-1"
+                        style="font-size:0.75rem;border-radius:6px;"
+                       ><i class="bi bi-piggy-bank me-1"></i>Abono</button>`
+                    : '';
+
+                const estadoCurrent = (d.estado || (impagoDoc === 0 ? 'pagada' : (pagadoDoc > 0 ? 'parcial' : 'pendiente'))).toLowerCase();
+
+                const actionCols = `
+                    <td style="padding:6px 8px;text-align:right;color:#059669;font-weight:600;">${PortalApp.fmt(pagadoDoc)}</td>
+                    <td style="padding:6px 8px;text-align:right;color:#d97706;font-weight:700;">${PortalApp.fmt(impagoDoc)}</td>
                     <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
-                        <button onclick="DocumentosModule.eliminarDocDetalle(window._CFG_${cfg.tipo.toUpperCase()},${id},${idx})"
+                        ${isPagar ? abonoBtn : abonoCobrarBtn}
+                        <button onclick="DocumentosModule.eliminarDocDetalle(window._CFG_${cfg.tipo.toUpperCase()}, '${id}', ${idx})"
                             title="Eliminar documento"
                             style="border:none;background:transparent;color:#dc2626;padding:2px 6px;border-radius:6px;cursor:pointer;font-size:.85rem;"
                         ><i class="bi bi-trash3"></i></button>
                     </td>
-                </tr>`).join('')
-            : `<tr><td colspan="5" style="text-align:center;padding:14px;color:#94a3b8;font-size:.78rem;">
+                    ${!isPagar ? `
+                    <td style="padding:4px 8px;text-align:center;">
+                        <select class="form-select form-select-sm estado-doc-select" 
+                                style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border-color:#cbd5e1;width:115px;" 
+                                data-nro="${d.nro || d.numero || ''}" 
+                                data-rut="${d.rut || r.rut || ''}" 
+                                data-init-val="${estadoCurrent}"
+                                data-pagado="${pagadoDoc}"
+                                data-impago="${impagoDoc}"
+                                onchange="DocumentosModule.onEstadoDocDetalleChange()">
+                            <option value="pendiente" ${estadoCurrent === 'pendiente' ? 'selected' : ''}>🔴 Pendiente</option>
+                            <option value="parcial" ${estadoCurrent === 'parcial' ? 'selected' : ''}>🟡 Parcial</option>
+                            <option value="pagada" ${estadoCurrent === 'pagada' || estadoCurrent === 'pagado' ? 'selected' : ''}>🟢 Pagado</option>
+                        </select>
+                    </td>
+                    ` : ''}
+                `;
+
+                return `
+                <tr>
+                    <td style="padding:6px 10px;">
+                        <span class="badge" style="background:#eff6ff;color:#2563eb;font-size:.72rem;">${d.tipo || 'Sin tipo'}</span>
+                    </td>
+                    <td style="padding:6px 10px;font-size:.78rem;font-weight:500;">${folioDoc}</td>
+                    <td style="padding:6px 10px;font-size:.76rem;color:#64748b;">${d.fecha || '—'}</td>
+                    <td style="padding:6px 10px;text-align:right;color:#2563eb;font-weight:700;">${PortalApp.fmt(totalMontoDoc)}</td>
+                    ${actionCols}
+                </tr>`;
+            }).join('')
+            : `<tr><td colspan="8" style="text-align:center;padding:14px;color:#94a3b8;font-size:.78rem;">
                 <i class="bi bi-info-circle me-1"></i>Sin documentos registrados
             </td></tr>`;
 
-        const totalMonto = docs.reduce((s, d) => s + (d.monto ?? d.total ?? 0), 0);
+        const totalImpagoMonto = docs.reduce((s, d) => {
+            const tot = parseFloat(d.monto ?? d.total ?? 0);
+            const pag = parseFloat(d.pagado ?? 0);
+            const imp = (d.impago !== undefined && d.impago !== null) ? parseFloat(d.impago) : Math.max(0, tot - pag);
+            return s + imp;
+        }, 0);
         const labelEntidad = cfg.label;
 
         body.innerHTML = `
@@ -388,12 +447,12 @@ window.DocumentosModule = (function () {
             <div class="col-6"><div style="font-size:.70rem;color:#8fa3bc;">RUT</div><div style="font-size:.88rem;font-weight:600;">${r.rut || '—'}</div></div>
             <div class="col-12">
                 <div style="font-size:.70rem;color:#8fa3bc;">Total Impago</div>
-                <div style="font-size:1.4rem;font-weight:800;color:${color};">${PortalApp.fmt(totalMonto)}</div>
+                <div style="font-size:1.4rem;font-weight:800;color:${color};">${PortalApp.fmt(totalImpagoMonto)}</div>
             </div>
         </div>
         <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:.74rem;color:#92400e;margin-bottom:10px;">
             <i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>
-            Los cambios se guardan automáticamente en la base de datos.
+            Los cambios se guardan automáticamente en la base de datos al presionar Aplicar Cambios.
         </div>
         <div style="font-size:.78rem;font-weight:600;color:#1a2940;margin-bottom:6px;">
             <i class="bi bi-receipt me-1" style="color:${color};"></i>
@@ -406,21 +465,28 @@ window.DocumentosModule = (function () {
                         <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Tipo</th>
                         <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">N° Doc.</th>
                         <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Fecha</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Monto</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:70px;background:#f8fafc;">Acción</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Total</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#059669;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Pagado</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#d97706;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Impago</th>
+                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:70px;background:#f8fafc;">Acciones</th>
+                        ${!isPagar ? `<th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:115px;background:#f8fafc;">Estado</th>` : ''}
                     </tr>
                 </thead>
                 <tbody>${docsRows}</tbody>
                 ${docs.length > 1 ? `
                 <tfoot style="position:sticky;bottom:0;z-index:10;background:#f0f4f9;">
                     <tr style="background:#f0f4f9;">
-                        <td colspan="3" style="padding:8px 12px;font-size:.74rem;font-weight:700;color:#1a2940;text-align:right;background:#f0f4f9;">TOTAL</td>
-                        <td style="padding:8px 12px;text-align:right;font-weight:800;color:${color};background:#f0f4f9;">${PortalApp.fmt(totalMonto)}</td>
-                        <td style="background:#f0f4f9;"></td>
+                        <td colspan="5" style="padding:8px 12px;font-size:.74rem;font-weight:700;color:#1a2940;text-align:right;background:#f0f4f9;">TOTAL IMPAGO</td>
+                        <td style="padding:8px 12px;text-align:right;font-weight:800;color:${color};background:#f0f4f9;">${PortalApp.fmt(totalImpagoMonto)}</td>
+                        <td colspan="${isPagar ? 1 : 2}" style="background:#f0f4f9;"></td>
                     </tr>
                 </tfoot>` : ''}
             </table>
         </div>`;
+
+        // Asegurar que el botón Aplicar esté oculto al renderizar de nuevo
+        const btn = document.getElementById('btnAplicarEstadoDetalle');
+        if (btn) btn.style.display = 'none';
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -428,7 +494,7 @@ window.DocumentosModule = (function () {
     // ─────────────────────────────────────────────────────────────────────
     async function eliminarDocDetalle(cfg, entidadId, docIdx) {
         const db = cfg.db();
-        const r = db.find(x => x.id === entidadId);
+        const r = db.find(x => String(x.id) === String(entidadId));
         if (!r || !r.docs) return;
 
         if (r.docs.length <= 1) {
@@ -545,23 +611,36 @@ window.DocumentosModule = (function () {
         const db = cfg.db();
         const entidades = db
             .filter(c => c.docs && c.docs.length > 0)
-            .map(c => ({
-                emisor_receptor: c.nombre || c.cliente || c.proveedor || '',
-                rut: c.rut || '',
-                docs: c.docs.map(doc => {
+            .map(c => {
+                const seenDocs = new Set();
+                const uniqueDocs = [];
+                (c.docs || []).forEach(doc => {
+                    const rawNum = String(doc.nro || doc.numero || '').trim();
+                    if (!rawNum) return;
+                    let cleanNum = rawNum.replace(/^0+/, '');
+                    if (!cleanNum) cleanNum = '0';
+                    if (seenDocs.has(cleanNum)) return;
+                    seenDocs.add(cleanNum);
+
                     const total = parseFloat(doc.total ?? doc.monto ?? 0);
                     const pagado = parseFloat(doc.pagado ?? 0);
                     const impago = doc.impago !== undefined ? parseFloat(doc.impago) : (total - pagado);
-                    return {
-                        tipo_documento: doc.tipo || 'Sin tipo',
+                    uniqueDocs.push({
+                        tipo_documento: doc.tipo || doc.tipo_documento || 'Sin tipo',
                         fecha: doc.fecha || '',
-                        numero: String(doc.nro || doc.numero || ''),
+                        numero: cleanNum,
                         rut: doc.rut || c.rut || '',
                         total, pagado,
                         impago: Math.max(0, impago),
-                    };
-                }),
-            }));
+                    });
+                });
+                return {
+                    emisor_receptor: c.nombre || c.cliente || c.proveedor || '',
+                    rut: c.rut || '',
+                    docs: uniqueDocs,
+                };
+            })
+            .filter(e => e.docs.length > 0);
 
         if (!entidades.length) {
             PortalApp.toast(`No hay ${cfg.labelPlural} con documentos para sincronizar.`, 'warning');
@@ -628,6 +707,7 @@ window.DocumentosModule = (function () {
                 const impago = parseFloat(row.impago ?? 0);
                 mapa[key].monto += impago;
                 mapa[key].docs.push({
+                    id: row.id ? parseInt(row.id) : 0,
                     tipo: row.tipo_documento || 'Sin tipo',
                     nro: row.numero || '',
                     fecha: row.fecha || '',
@@ -1012,10 +1092,301 @@ window.DocumentosModule = (function () {
     // ─────────────────────────────────────────────────────────────────────
     function _capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
+    function onEstadoDocDetalleChange() {
+        const btn = document.getElementById('btnAplicarEstadoDetalle');
+        if (!btn) return;
+        const selects = document.querySelectorAll('#detalleBody .estado-doc-select');
+        let hasChanges = false;
+        selects.forEach(s => {
+            const initVal = s.getAttribute('data-init-val') || 'pendiente';
+            if (s.value !== initVal) hasChanges = true;
+        });
+        btn.style.display = hasChanges ? 'inline-block' : 'none';
+    }
+
+    async function aplicarCambiosEstadoDetalle(cfg) {
+        const btn = document.getElementById('btnAplicarEstadoDetalle');
+        const selects = document.querySelectorAll('#detalleBody .estado-doc-select');
+        const docsToUpdate = [];
+
+        selects.forEach(s => {
+            const initVal = s.getAttribute('data-init-val') || 'pendiente';
+            const isMod   = s.getAttribute('data-modified') === 'true';
+            if (s.value !== initVal || isMod) {
+                const itemData = {
+                    nro: s.getAttribute('data-nro'),
+                    rut: s.getAttribute('data-rut'),
+                    estado: s.value
+                };
+                if (s.hasAttribute('data-pagado')) {
+                    itemData.pagado = parseFloat(s.getAttribute('data-pagado'));
+                }
+                if (s.hasAttribute('data-impago')) {
+                    itemData.impago = parseFloat(s.getAttribute('data-impago'));
+                }
+                docsToUpdate.push(itemData);
+            }
+        });
+
+        if (docsToUpdate.length === 0) {
+            PortalApp.toast('No hay cambios pendientes por aplicar', 'warning');
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Aplicando...`;
+        }
+
+        try {
+            const { data } = await PortalApp.apiFetch('/cobranza/facto/marcar-pagadas-desde-cobrar', {
+                method: 'POST',
+                body: JSON.stringify({ documentos: docsToUpdate })
+            });
+
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-check2-all me-1"></i> Aplicar Cambios`;
+                btn.style.display = 'none';
+            }
+
+            if (data && data.success) {
+                PortalApp.toast(data.message || 'Estado de documentos actualizado correctamente', 'success');
+                
+                // Ocultar modal detalle
+                const modalDet = document.getElementById(cfg.modalDetalle);
+                if (modalDet) PortalApp.hideModal(cfg.modalDetalle);
+
+                // Recargar Cuentas por Cobrar desde BD
+                await cargarDesdeBD(cfg);
+            } else {
+                PortalApp.toast(data?.message || 'Error al actualizar estado de documentos', 'danger');
+            }
+        } catch (e) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-check2-all me-1"></i> Aplicar Cambios`;
+            }
+            PortalApp.toast('Error de conexión con el servidor', 'danger');
+        }
+    }
+
+    function abrirModalAbonoPagar(docId, folio, total, impago) {
+        document.getElementById('abonoDocId').value = docId;
+        document.getElementById('abonoFolioText').textContent = '#' + folio;
+        document.getElementById('abonoImpagoText').textContent = PortalApp.fmt(impago);
+        document.getElementById('abonoMontoInput').value = '';
+        document.getElementById('abonoComentarioInput').value = '';
+
+        const container = document.getElementById('abonosHistorialContainer');
+        const lista = document.getElementById('abonosHistorialLista');
+
+        // Cargar historial de abonos
+        PortalApp.apiFetch('/cuentas-pagar/abonos?doc_id=' + docId, { method: 'GET' })
+            .then(({ data }) => {
+                if (data && data.success && data.abonos && data.abonos.length > 0) {
+                    container.style.display = 'block';
+                    lista.innerHTML = data.abonos.map(a => `
+                        <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                            <div>
+                                <span class="fw-bold text-success">${PortalApp.fmt(a.monto)}</span>
+                                <span class="text-muted ms-2">${a.fecha}</span>
+                                ${a.comentario ? `<div class="text-slate-500" style="font-size:0.72rem;">${a.comentario}</div>` : ''}
+                            </div>
+                            <button onclick="DocumentosModule.eliminarAbonoPagar(${a.id}, ${docId})" class="btn btn-xs text-danger py-0" title="Eliminar abono"><i class="bi bi-x-circle-fill"></i></button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.style.display = 'none';
+                    lista.innerHTML = '';
+                }
+            }).catch(() => {});
+
+        const modalEl = document.getElementById('modalAbonoPagar');
+        if (modalEl) modalEl.style.zIndex = '1065';
+
+        PortalApp.showModal('modalAbonoPagar');
+
+        setTimeout(() => {
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            if (backdrops.length > 1) {
+                backdrops[backdrops.length - 1].style.zIndex = '1060';
+            }
+        }, 150);
+    }
+
+    async function guardarAbonoPagar() {
+        const docId = parseInt(document.getElementById('abonoDocId').value) || 0;
+        const monto = parseFloat(document.getElementById('abonoMontoInput').value) || 0;
+        const fecha = document.getElementById('abonoFechaInput').value;
+        const comentario = document.getElementById('abonoComentarioInput').value;
+
+        if (docId <= 0) { PortalApp.toast('Seleccione un documento válido', 'warning'); return; }
+        if (monto <= 0) { PortalApp.toast('Ingrese un monto a abonar mayor a 0', 'warning'); return; }
+        if (!fecha) { PortalApp.toast('Ingrese la fecha del abono', 'warning'); return; }
+
+        const btn = document.getElementById('btnGuardarAbono');
+        if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>Guardando...`; }
+
+        try {
+            const { data } = await PortalApp.apiFetch('/cuentas-pagar/abonos', {
+                method: 'POST',
+                body: JSON.stringify({ doc_id: docId, monto, fecha, comentario })
+            });
+
+            if (btn) { btn.disabled = false; btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Registrar Abono`; }
+
+            if (data && data.success) {
+                PortalApp.toast(data.message || 'Abono registrado con éxito', 'success');
+                PortalApp.hideModal('modalAbonoPagar');
+
+                // Recargar Cuentas por Pagar desde BD
+                await cargarDesdeBD(window._CFG_PAGAR);
+            } else {
+                PortalApp.toast(data?.message || 'Error al registrar abono', 'danger');
+            }
+        } catch (e) {
+            if (btn) { btn.disabled = false; btn.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Registrar Abono`; }
+            PortalApp.toast('Error de conexión con el servidor', 'danger');
+        }
+    }
+
+    async function eliminarAbonoPagar(abonoId, docId) {
+        if (!confirm('¿Está seguro de eliminar este abono?')) return;
+        try {
+            const { data } = await PortalApp.apiFetch('/cuentas-pagar/abonos/' + abonoId, {
+                method: 'DELETE'
+            });
+            if (data && data.success) {
+                PortalApp.toast('Abono eliminado correctamente', 'info');
+                PortalApp.hideModal('modalAbonoPagar');
+                await cargarDesdeBD(window._CFG_PAGAR);
+            } else {
+                PortalApp.toast(data?.message || 'Error al eliminar abono', 'danger');
+            }
+        } catch (e) {
+            PortalApp.toast('Error al eliminar abono', 'danger');
+        }
+    }
+
+    async function abrirAbonoCobrarPrompt(cfg, entidadId, docIdx) {
+        const db = cfg.db();
+        const r = db.find(x => String(x.id) === String(entidadId));
+        if (!r || !r.docs || !r.docs[docIdx]) return;
+        const d = r.docs[docIdx];
+        const folio = d.nro || d.numero || '—';
+        const total = parseFloat(d.total || d.monto || 0);
+        const pagadoActual = parseFloat(d.pagado || 0);
+        const impagoActual = parseFloat(d.impago !== undefined ? d.impago : (total - pagadoActual));
+
+        let abonoMonto = null;
+
+        if (typeof Swal !== 'undefined') {
+            const modalDet = document.getElementById('modalDetalle');
+            const res = await Swal.fire({
+                target: modalDet || 'body',
+                title: `Ingresar Abono — Doc #${folio}`,
+                html: `
+                    <div style="font-size:.86rem;text-align:left;margin-bottom:16px;color:#334155;background:#f8fafc;padding:12px;border-radius:10px;border:1px solid #e2e8f0;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Total Documento:</span>
+                            <span style="font-weight:700;">${PortalApp.fmt(total)}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                            <span style="color:#64748b;">Pagado Actual:</span>
+                            <span style="font-weight:600;color:#059669;">${PortalApp.fmt(pagadoActual)}</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;">
+                            <span style="color:#64748b;">Saldo Impago:</span>
+                            <span style="font-weight:800;color:#d97706;">${PortalApp.fmt(impagoActual)}</span>
+                        </div>
+                    </div>
+                    <div style="text-align:left;">
+                        <label style="font-size:.82rem;font-weight:600;color:#1e293b;margin-bottom:4px;display:block;">Monto a Abonar ($):</label>
+                        <input id="swalAbonoInput" type="number" min="1" max="${impagoActual}" step="1" autocomplete="off" class="form-control form-control-lg" placeholder="Ej: 20000" style="font-size:1.1rem;font-weight:700;border-radius:10px;border:2px solid #cbd5e1;padding:10px 14px;">
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#7c3aed',
+                confirmButtonText: 'Aplicar Abono',
+                cancelButtonText: 'Cancelar',
+                didOpen: () => {
+                    const inp = document.getElementById('swalAbonoInput');
+                    if (inp) {
+                        setTimeout(() => {
+                            inp.focus();
+                            inp.select();
+                        }, 50);
+                    }
+                },
+                preConfirm: () => {
+                    const inp = document.getElementById('swalAbonoInput');
+                    const v = parseInt(inp ? inp.value : '0', 10);
+                    if (!inp || !inp.value || isNaN(v) || v <= 0) {
+                        Swal.showValidationMessage('Ingrese un monto válido mayor a $0');
+                        return false;
+                    }
+                    if (v > impagoActual) {
+                        Swal.showValidationMessage(`El abono no puede superar el saldo impago (${PortalApp.fmt(impagoActual)})`);
+                        return false;
+                    }
+                    return v;
+                }
+            });
+            abonoMonto = res.value;
+        } else {
+            const inputVal = prompt(`Ingresar Abono para Doc #${folio}\nTotal: ${PortalApp.fmt(total)}\nPagado: ${PortalApp.fmt(pagadoActual)}\nSaldo Impago: ${PortalApp.fmt(impagoActual)}\n\nIngrese monto a abonar ($):`);
+            if (inputVal !== null) {
+                const v = parseFloat(inputVal);
+                if (isNaN(v) || v <= 0) {
+                    alert('Monto inválido.');
+                    return;
+                }
+                if (v > impagoActual) {
+                    alert(`El abono no puede superar el saldo impago (${PortalApp.fmt(impagoActual)}).`);
+                    return;
+                }
+                abonoMonto = v;
+            }
+        }
+
+        if (abonoMonto) {
+            const montoVal = parseFloat(abonoMonto);
+            d.pagado = (parseFloat(d.pagado) || 0) + montoVal;
+            d.impago = Math.max(0, total - d.pagado);
+            d.estado = (d.impago <= 0) ? 'pagada' : 'parcial';
+
+            r.monto = r.docs.reduce((s, doc) => {
+                const tot = parseFloat(doc.total ?? doc.monto ?? 0);
+                const pag = parseFloat(doc.pagado ?? 0);
+                const imp = (doc.impago !== undefined && doc.impago !== null) ? parseFloat(doc.impago) : Math.max(0, tot - pag);
+                return s + imp;
+            }, 0);
+
+            const body = document.getElementById(cfg.detalleBody);
+            _renderDetalleBody(cfg, entidadId, body);
+            renderTabla(cfg);
+
+            const selectEl = body.querySelector(`.estado-doc-select[data-nro="${folio}"]`);
+            if (selectEl) {
+                selectEl.value = d.estado;
+                selectEl.setAttribute('data-modified', 'true');
+                selectEl.setAttribute('data-pagado', d.pagado);
+                selectEl.setAttribute('data-impago', d.impago);
+            }
+
+            const btn = document.getElementById('btnAplicarEstadoDetalle');
+            if (btn) btn.style.display = 'inline-block';
+        }
+    }
+
     // API pública
     return {
         renderTabla, filtrar, abrirModalAgregar, guardarRegistro,
         verDetalle, _renderDetalleBody,
+        onEstadoDocDetalleChange, aplicarCambiosEstadoDetalle,
+        abrirAbonoCobrarPrompt,
+        abrirModalAbonoPagar, guardarAbonoPagar, eliminarAbonoPagar,
         eliminarDocDetalle, agregarDocDetalle,
         eliminar, confirmarEliminar,
         guardarEnBD, cargarDesdeBD,

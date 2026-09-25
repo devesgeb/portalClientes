@@ -23,7 +23,14 @@ class CuentasPagarModel extends Model
             SELECT
                 dp.id,
                 dp.rut_proveedor,
-                COALESCE(p.nombre, p.razon_social, dp.rut_proveedor) AS nombre_proveedor,
+                COALESCE(
+                    (SELECT COALESCE(p.nombre, p.razon_social) 
+                     FROM tbl_proveedores p 
+                     WHERE p.rut = dp.rut_proveedor 
+                        OR REPLACE(REPLACE(REPLACE(p.rut, '.', ''), ' ', ''), '-', '') = REPLACE(REPLACE(REPLACE(dp.rut_proveedor, '.', ''), ' ', ''), '-', '') 
+                     ORDER BY p.id ASC LIMIT 1),
+                    dp.rut_proveedor
+                ) AS nombre_proveedor,
                 dp.tipo_documento,
                 dp.numero,
                 dp.fecha,
@@ -32,11 +39,6 @@ class CuentasPagarModel extends Model
                 dp.impago,
                 dp.comentario
             FROM tbl_documentos_pagar dp
-            LEFT JOIN tbl_proveedores p 
-               ON (
-                   p.rut = dp.rut_proveedor 
-                   OR REPLACE(REPLACE(REPLACE(p.rut, '.', ''), ' ', ''), '-', '') = REPLACE(REPLACE(REPLACE(dp.rut_proveedor, '.', ''), ' ', ''), '-', '')
-               )
             WHERE dp.impago > 0
             ORDER BY nombre_proveedor ASC, dp.fecha ASC
         ");
@@ -48,7 +50,8 @@ class CuentasPagarModel extends Model
      */
     public function totalImpago(): float
     {
-        $row = $this->db->query("SELECT COALESCE(SUM(impago),0) AS total FROM tbl_documentos_pagar WHERE impago > 0")->getRowArray();
+        $res = $this->db->query("SELECT COALESCE(SUM(impago),0) AS total FROM tbl_documentos_pagar WHERE impago > 0");
+        $row = ($res && is_object($res)) ? $res->getRowArray() : null;
         return (float)($row['total'] ?? 0);
     }
 
@@ -74,11 +77,12 @@ class CuentasPagarModel extends Model
                 if (empty($rutClean) || empty($docs)) continue;
 
                 // Crear o actualizar proveedor si no existe por RUT limpio
-                $existeProv = $this->db->table('tbl_proveedores')
+                $qProv = $this->db->table('tbl_proveedores')
                     ->where('rut', $rutRaw)
                     ->orWhere('rut', $rutClean)
                     ->orWhere("REPLACE(REPLACE(REPLACE(rut, '.', ''), ' ', ''), '-', '') = '{$rutClean}'")
-                    ->get()->getRowArray();
+                    ->get();
+                $existeProv = ($qProv && is_object($qProv)) ? $qProv->getRowArray() : null;
 
                 if (!$existeProv) {
                     $this->db->table('tbl_proveedores')->insert([
@@ -120,8 +124,13 @@ class CuentasPagarModel extends Model
                 $seenNums = [];
                 foreach ($docs as $doc) {
                     $numDoc = (string)($doc['numero'] ?? $doc['nro'] ?? '');
-                    if (empty($numDoc) || isset($seenNums[$numDoc])) continue;
-                    $seenNums[$numDoc] = true;
+                    if (empty($numDoc)) continue;
+
+                    $numClean = ltrim(trim($numDoc), '0');
+                    if (empty($numClean)) $numClean = '0';
+
+                    if (isset($seenNums[$numClean])) continue;
+                    $seenNums[$numClean] = true;
 
                     $total      = (float)($doc['total']  ?? 0);
                     $pagado     = (float)($doc['pagado'] ?? 0);
@@ -131,7 +140,7 @@ class CuentasPagarModel extends Model
                     $this->db->table('tbl_documentos_pagar')->insert([
                         'rut_proveedor'  => $rutRaw ?: $rutClean,
                         'tipo_documento' => $doc['tipo_documento'] ?? $doc['tipo'] ?? 'Sin tipo',
-                        'numero'         => $numDoc,
+                        'numero'         => $numClean,
                         'fecha'          => $this->parsearFecha($doc['fecha'] ?? ''),
                         'total'          => $total,
                         'pagado'         => $pagado,
@@ -220,8 +229,8 @@ class CuentasPagarModel extends Model
      */
     public function eliminarAbono(int $abonoId): bool
     {
-        $abono = $this->db->table('tbl_abonos_pagar')
-            ->where('id', $abonoId)->get()->getRowArray();
+        $qAbono = $this->db->table('tbl_abonos_pagar')->where('id', $abonoId)->get();
+        $abono  = ($qAbono && is_object($qAbono)) ? $qAbono->getRowArray() : null;
         if (!$abono) return false;
 
         $docId = (int)$abono['doc_id'];
