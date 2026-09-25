@@ -424,16 +424,18 @@ class BalanceDiario extends BaseController
                 SELECT
                     f.sku,
                     f.nombre,
-                    'Facto API'                                           AS categoria,
+                    'Facto API'                                                         AS categoria,
                     f.marca,
-                    f.costo_neto,
-                    ROUND(f.costo_neto * 1.19, 0)                         AS precio_con_iva,
-                    ROUND(f.costo_neto * 0.19, 0)                         AS monto_iva,
-                    f.stock                                               AS stock,
-                    f.stock_reservado,
-                    ROUND(f.costo_neto * 1.19 * f.stock, 0)               AS total
+                    COALESCE(NULLIF(f.costo_neto, 0), p.costo_neto, f.precio_neto, 0)   AS costo_neto,
+                    ROUND(COALESCE(NULLIF(f.costo_neto, 0), p.costo_neto, f.precio_neto, 0) * 1.19, 0) AS precio_con_iva,
+                    ROUND(COALESCE(NULLIF(f.costo_neto, 0), p.costo_neto, f.precio_neto, 0) * 0.19, 0) AS monto_iva,
+                    COALESCE(NULLIF(f.stock, 0), p.stock_bodega_ppral, 0)              AS stock,
+                    COALESCE(f.stock_reservado, p.stock_reservado, 0)                 AS stock_reservado,
+                    ROUND(COALESCE(NULLIF(f.costo_neto, 0), p.costo_neto, f.precio_neto, 0) * 1.19 * COALESCE(NULLIF(f.stock, 0), p.stock_bodega_ppral, 0), 0) AS total
                 FROM tbl_facto_productos f
-                WHERE f.stock > 0
+                LEFT JOIN tbl_productos p ON p.sku COLLATE utf8mb4_general_ci = f.sku COLLATE utf8mb4_general_ci
+                WHERE (f.facto_lista_id = 1 OR f.facto_lista_id IS NULL)
+                  AND COALESCE(NULLIF(f.stock, 0), p.stock_bodega_ppral, 0) > 0
                 GROUP BY f.sku
                 ORDER BY f.nombre ASC
             ")->getResultArray();
