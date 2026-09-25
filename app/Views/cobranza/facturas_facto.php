@@ -218,11 +218,16 @@
 
         <!-- Filtros de Búsqueda -->
         <div class="search-card">
-            <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
-                <h6 class="fw-bold text-slate-800 mb-0 d-flex align-items-center gap-2">
-                    <i class="bi bi-funnel-fill text-primary" style="font-size:1.1rem;"></i>Filtros de Búsqueda Facto
-                </h6>
-                <span class="text-muted" style="font-size:0.78rem;">Filtra y organiza los documentos emitidos desde Koywe Facto API</span>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 border-bottom pb-2">
+                <div>
+                    <h6 class="fw-bold text-slate-800 mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-funnel-fill text-primary" style="font-size:1.1rem;"></i>Filtros de Búsqueda Facto
+                    </h6>
+                    <span class="text-muted" style="font-size:0.78rem;">Filtra y organiza los documentos emitidos desde TuPana / Facto API</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" onclick="sincronizarDtesVentas(event)" style="font-size:0.82rem;">
+                    <i class="bi bi-arrow-repeat me-1"></i>Sincronizar Documentos Ventas
+                </button>
             </div>
             
             <form id="formFiltros" onsubmit="event.preventDefault(); buscarDocumentos();">
@@ -944,6 +949,40 @@
             </div>`;
         toastWrapper.innerHTML = toastHtml;
         setTimeout(() => { toastWrapper.innerHTML = ''; }, 3500);
+    }
+
+    async function sincronizarDtesVentas(evt) {
+        const btn = evt ? (evt.currentTarget || evt.target) : null;
+        let oldText = '';
+        if (btn) {
+            oldText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sincronizando…';
+        }
+
+        try {
+            const resp = await fetch(`${baseUrl}cron/sync-facto`);
+            const data = await resp.json();
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sincronización Completada',
+                    text: `${data.processed || 0} documento(s) procesados (${data.new_items || 0} nuevos).`,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                buscarDocumentos(1);
+            } else {
+                Swal.fire('Atención', data.message || 'No se pudieron sincronizar los documentos.', 'warning');
+            }
+        } catch (e) {
+            Swal.fire('Error', 'No se pudo conectar con el servidor para la sincronización.', 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = oldText;
+            }
+        }
     }
 
     // Carga inicial al cargar la página

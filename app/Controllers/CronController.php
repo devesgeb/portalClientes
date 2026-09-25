@@ -67,18 +67,18 @@ class CronController extends BaseController
         $newItemsCount = 0;
 
         foreach ($rawItems as $item) {
-            $folioDoc      = trim((string)($item['document_number'] ?? ''));
+            $folioDoc      = trim((string)($item['folio'] ?? $item['document_number'] ?? ''));
             if (empty($folioDoc)) continue;
 
-            $taxBureauCode = (int)($item['document_type_taxbureau'] ?? 33);
-            $rutDoc        = trim((string)($item['receiver_tax_id_code'] ?? ''));
-            $nombreDoc     = trim((string)($item['receiver_legal_name'] ?? ''));
-            $neto          = (float)($item['net_amount'] ?? 0);
-            $iva           = (float)($item['taxes_amount'] ?? 0);
-            $total         = (float)($item['total_amount'] ?? 0);
-            $docFechaRaw   = trim((string)($item['issue_date'] ?? ''));
+            $taxBureauCode = (int)($item['dte_type_code'] ?? $item['document_type_taxbureau'] ?? 33);
+            $rutDoc        = trim((string)($item['receiver_tax_id'] ?? $item['receiver_tax_id_code'] ?? ''));
+            $nombreDoc     = trim((string)($item['receiver_name'] ?? $item['receiver_legal_name'] ?? ''));
+            $total         = (float)($item['amount_with_iva'] ?? $item['total_amount'] ?? 0);
+            $neto          = (float)($item['net_amount'] ?? round($total / 1.19, 2));
+            $iva           = (float)($item['taxes_amount'] ?? round($total - $neto, 2));
+            $docFechaRaw   = trim((string)($item['date_issued'] ?? $item['issue_date'] ?? ''));
             $docFecha      = !empty($docFechaRaw) ? date('Y-m-d', strtotime($docFechaRaw)) : null;
-            $estadoSii     = ((int)($item['taxbureau_sending_status'] ?? 0) === 1) ? 'Aceptado' : 'Pendiente';
+            $estadoSii     = 'Aceptado';
 
             $folioDocClean = ltrim($folioDoc, '0');
             $key           = $folioDoc . '_' . $taxBureauCode;
@@ -154,7 +154,7 @@ class CronController extends BaseController
 
         return $this->response->setJSON([
             'success'   => true,
-            'message'   => "Sincronización Cron Facto completada a las " . date('H:i:s'),
+            'message'   => "Sincronización Cron completada a las " . date('H:i:s'),
             'processed' => $processed,
             'new_items' => $newItemsCount,
             'timestamp' => date('Y-m-d H:i:s')
@@ -164,40 +164,36 @@ class CronController extends BaseController
     private function fetchFactoDocuments(string $token, string $fromDate): array
     {
         $rawItems = [];
+        $apiKey = env('TUPANA_API_KEY') ?: 'b21b307acd513ad3bfc9da60fe10b420fc41370f904f84d34ab038ab3a68ea56';
+        $masterEntityId = env('TUPANA_MASTER_ENTITY_ID') ?: '2205607';
 
-        // Consultar a Facto únicamente los documentos emitidos desde $fromDate
-        $yearParams = [
-            'received_issued_flag' => 1,
-            'issue_date_from'      => $fromDate,
-            'limit'                => 100
-        ];
-
+        // Consultar API oficial de TuPana (o Facto DTEs de ventas emitidas)
         for ($page = 1; $page <= 5; $page++) {
-            $yearParams['page'] = $page;
-            $url = 'https://api.facto.cl/v1/documents?' . http_build_query($yearParams);
+            $url = "https://api.tupana.ai/v1/documents?master_entity_id={$masterEntityId}&page={$page}";
 
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 12);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}", "Accept: application/json"]);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Api-Key {$apiKey}",
+                "Accept: application/json"
+            ]);
             $resp = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             if ($code === 200 && $resp) {
                 $data = json_decode($resp, true);
-                $items = $data['_embedded']['documents'] ?? $data['_embedded']['items'] ?? [];
+                $items = $data['results'] ?? [];
                 if (empty($items)) break;
-                
-                $existingIds = array_filter(array_column($rawItems, 'document_id'));
+
                 foreach ($items as $it) {
-                    $dId = $it['document_id'] ?? null;
-                    if ($dId && !in_array($dId, $existingIds, true)) {
-                        $rawItems[] = $it;
-                    }
+                    $rawItems[] = $it;
                 }
-                if (count($items) < 100) break;
+
+                $totalPages = (int)($data['total_pages'] ?? 1);
+                if ($page >= $totalPages) break;
             } else {
                 break;
             }
