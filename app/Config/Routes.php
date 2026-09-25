@@ -148,7 +148,7 @@ $routes->post('/logistica/api/funcionarios/(:num)/eventos',  'LogisticaControlle
 $routes->delete('/logistica/api/eventos/(:num)',              'LogisticaController::eliminarEvento/$1');
 
 // ── Bodega & Productos ───────────────
-$routes->get('/productos',                         'BodegaController::productos');
+$routes->get('/productos',                         'BodegaController::factoProductos');
 $routes->get('/bodega/lista-productos',            'BodegaController::listarProductos');
 $routes->get('/bodega/producto/(:any)',             'BodegaController::getProducto/$1');
 $routes->patch('/bodega/producto/(:any)',           'BodegaController::actualizarProducto/$1');
