@@ -531,8 +531,26 @@ class BodegaController extends BaseController
         $listas = [];
         if ($db->tableExists('tbl_facto_listas_precios')) {
             $listas = $db->table('tbl_facto_listas_precios')
-                         ->orderBy('nombre', 'DESC')
+                         ->orderBy('nombre', 'ASC')
                          ->get()->getResultArray();
+        }
+
+        // Si tbl_facto_listas_precios está vacía, fallback a distintas listas registradas en tbl_facto_productos
+        if (empty($listas) && $db->tableExists('tbl_facto_productos')) {
+            $listasRaw = $db->query(
+                "SELECT DISTINCT facto_lista_id, 
+                        COALESCE(NULLIF(nombre_lista, ''), CONCAT('Lista #', facto_lista_id)) AS nombre 
+                 FROM tbl_facto_productos 
+                 WHERE facto_lista_id IS NOT NULL AND facto_lista_id > 0
+                 ORDER BY facto_lista_id ASC"
+            )->getResultArray();
+
+            foreach ($listasRaw as $lr) {
+                $listas[] = [
+                    'facto_lista_id' => $lr['facto_lista_id'],
+                    'nombre'         => $lr['nombre']
+                ];
+            }
         }
 
         return view('bodega/facto_productos', [
