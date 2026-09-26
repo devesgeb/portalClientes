@@ -139,6 +139,17 @@ window.PortalApp = (function () {
         });
     }
 
+    // ── HTML Escaping Helper ─────────────────────────────────────────────
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     // API pública
-    return { fmt, toast, apiFetch, showModal, hideModal, DOMReady, Autocomplete: { init: acInit } };
+    return { fmt, toast, apiFetch, showModal, hideModal, DOMReady, Autocomplete: { init: acInit }, escapeHtml };
 })();
