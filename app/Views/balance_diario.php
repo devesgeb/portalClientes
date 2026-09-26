@@ -991,9 +991,12 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
                 </div>
                 <div class="modal-body p-4" id="detalleBodyPagar"></div>
-                <div class="modal-footer" style="border-top:1px solid #f0f4f9;">
+                <div class="modal-footer justify-content-between" style="border-top:1px solid #f0f4f9;">
                     <button class="btn btn-sm" style="background:#f0f4f9;color:#5a7394;border-radius:8px;"
                         data-bs-dismiss="modal">Cerrar</button>
+                    <button class="btn btn-sm btn-warning px-3 fw-bold text-dark" id="btnGuardarDetallePagar" style="display:none;border-radius:8px;" onclick="DocumentosModule.guardarCambiosDetalle(window._CFG_PAGAR)">
+                        <i class="bi bi-floppy me-1"></i> Guardar Cambios
+                    </button>
                 </div>
             </div>
         </div>

@@ -165,32 +165,27 @@ window.DocumentosModule = (function () {
             const docPanel = document.getElementById(cfg.fieldElDoc);
             if (docPanel) docPanel.style.display = 'none';
 
-            // Bloquear monto si tiene > 1 doc
+            // Habilitar siempre el campo de monto para permitir edición directa
             const cantDocs = r.docs ? r.docs.length : 0;
-            function _aplicarBloqueo() {
+            function _desbloquearMonto() {
                 const montoInput = document.getElementById(cfg.inputMonto);
                 const montoAviso = document.getElementById(cfg.montoAviso);
                 const montoAvisoTxt = document.getElementById(cfg.montoAvisoTxt);
+                if (montoInput) {
+                    montoInput.removeAttribute('disabled');
+                    montoInput.style.removeProperty('background-color');
+                    montoInput.style.removeProperty('cursor');
+                }
                 if (cantDocs > 1) {
-                    if (montoInput) {
-                        montoInput.setAttribute('disabled', 'disabled');
-                        montoInput.style.setProperty('background-color', '#e9ecef', 'important');
-                        montoInput.style.setProperty('cursor', 'not-allowed', 'important');
-                    }
                     if (montoAvisoTxt) montoAvisoTxt.textContent =
-                        `El monto se calcula automáticamente desde los ${cantDocs} documentos. Use Ver detalle para modificar.`;
+                        `Puedes ajustar el monto total aquí o presionar Ver detalle para modificar documento por documento.`;
                     if (montoAviso) montoAviso.style.display = '';
                 } else {
-                    if (montoInput) {
-                        montoInput.removeAttribute('disabled');
-                        montoInput.style.removeProperty('background-color');
-                        montoInput.style.removeProperty('cursor');
-                    }
                     if (montoAviso) montoAviso.style.display = 'none';
                 }
-                if (modalEl) modalEl.removeEventListener('shown.bs.modal', _aplicarBloqueo);
+                if (modalEl) modalEl.removeEventListener('shown.bs.modal', _desbloquearMonto);
             }
-            if (modalEl) modalEl.addEventListener('shown.bs.modal', _aplicarBloqueo);
+            if (modalEl) modalEl.addEventListener('shown.bs.modal', _desbloquearMonto);
 
         } else {
             // Nuevo: limpiar todo
@@ -265,6 +260,23 @@ window.DocumentosModule = (function () {
                     r.docs[0].monto = monto;
                     const pagado = parseFloat(r.docs[0].pagado ?? 0);
                     r.docs[0].impago = Math.max(0, monto - pagado);
+                } else if (cantDocs > 1) {
+                    r.monto = monto;
+                    const oldImpagoTotal = r.docs.reduce((s, d) => s + (parseFloat(d.impago) || 0), 0);
+                    if (oldImpagoTotal > 0) {
+                        const factor = monto / oldImpagoTotal;
+                        r.docs.forEach(d => {
+                            const curImp = parseFloat(d.impago) || 0;
+                            const curPag = parseFloat(d.pagado) || 0;
+                            d.impago = Math.round(curImp * factor);
+                            d.total = curPag + d.impago;
+                            d.monto = d.total;
+                        });
+                    } else if (r.docs.length > 0) {
+                        r.docs[0].impago = monto;
+                        r.docs[0].total = (parseFloat(r.docs[0].pagado) || 0) + monto;
+                        r.docs[0].monto = r.docs[0].total;
+                    }
                 } else if (cantDocs === 0) {
                     r.monto = monto;
                     r.docs = [{
@@ -351,6 +363,17 @@ window.DocumentosModule = (function () {
         PortalApp.showModal(cfg.modalDetalle);
     }
 
+    function _formatFechaInput(str) {
+        if (!str || str === '—') return new Date().toISOString().slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        const parts = str.split(/[\/\-]/);
+        if (parts.length === 3) {
+            if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+        return new Date().toISOString().slice(0, 10);
+    }
+
     function _renderDetalleBody(cfg, id, body) {
         if (!body) return;
         const r = cfg.db().find(x => String(x.id) === String(id));
@@ -362,9 +385,8 @@ window.DocumentosModule = (function () {
 
         const docsRows = docs.length
             ? docs.map((d, idx) => {
-                const isPagar = (cfg.tipo === 'pagar');
                 const docId = d.id || 0;
-                const folioDoc = d.nro || d.numero || '—';
+                const folioDoc = d.nro || d.numero || '';
                 const totalMontoDoc = parseFloat(d.monto ?? d.total ?? 0);
                 const pagadoDoc = parseFloat(d.pagado ?? 0);
                 const impagoDoc = parseFloat(d.impago ?? (totalMontoDoc - pagadoDoc));
@@ -389,11 +411,44 @@ window.DocumentosModule = (function () {
                     : '';
 
                 const estadoCurrent = (d.estado || (impagoDoc === 0 ? 'pagada' : (pagadoDoc > 0 ? 'parcial' : 'pendiente'))).toLowerCase();
+                const fechaInputVal = _formatFechaInput(d.fecha);
 
-                const actionCols = `
-                    <td style="padding:6px 8px;text-align:right;color:#059669;font-weight:600;">${PortalApp.fmt(pagadoDoc)}</td>
-                    <td style="padding:6px 8px;text-align:right;color:#d97706;font-weight:700;">${PortalApp.fmt(impagoDoc)}</td>
-                    <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
+                return `
+                <tr class="doc-detail-row" data-idx="${idx}">
+                    <td style="padding:4px 6px;">
+                        <input type="text" class="form-control form-control-sm doc-input-tipo" 
+                               value="${PortalApp.escapeHtml(d.tipo || 'Factura')}" 
+                               style="font-size:0.75rem;padding:3px 6px;width:95px;"
+                               oninput="DocumentosModule.onDocDetailAmountChange('${cfg.tipo}', '${id}')">
+                    </td>
+                    <td style="padding:4px 6px;">
+                        <input type="text" class="form-control form-control-sm doc-input-nro" 
+                               value="${PortalApp.escapeHtml(folioDoc)}" 
+                               style="font-size:0.75rem;padding:3px 6px;width:90px;font-weight:600;"
+                               oninput="DocumentosModule.onDocDetailAmountChange('${cfg.tipo}', '${id}')">
+                    </td>
+                    <td style="padding:4px 6px;">
+                        <input type="date" class="form-control form-control-sm doc-input-fecha" 
+                               value="${fechaInputVal}" 
+                               style="font-size:0.75rem;padding:3px 6px;width:120px;"
+                               onchange="DocumentosModule.onDocDetailAmountChange('${cfg.tipo}', '${id}')">
+                    </td>
+                    <td style="padding:4px 6px;text-align:right;">
+                        <input type="number" min="0" step="1" class="form-control form-control-sm doc-input-total text-end fw-bold text-primary" 
+                               value="${totalMontoDoc}" 
+                               style="font-size:0.75rem;padding:3px 6px;width:110px;"
+                               oninput="DocumentosModule.onDocDetailAmountChange('${cfg.tipo}', '${id}')">
+                    </td>
+                    <td style="padding:4px 6px;text-align:right;">
+                        <input type="number" min="0" step="1" class="form-control form-control-sm doc-input-pagado text-end fw-semibold text-success" 
+                               value="${pagadoDoc}" 
+                               style="font-size:0.75rem;padding:3px 6px;width:100px;"
+                               oninput="DocumentosModule.onDocDetailAmountChange('${cfg.tipo}', '${id}')">
+                    </td>
+                    <td style="padding:6px 8px;text-align:right;color:#d97706;font-weight:700;font-size:0.80rem;" class="doc-impago-val">
+                        ${PortalApp.fmt(impagoDoc)}
+                    </td>
+                    <td style="padding:4px 6px;text-align:center;white-space:nowrap;">
                         ${isPagar ? abonoBtn : abonoCobrarBtn}
                         <button onclick="DocumentosModule.eliminarDocDetalle(window._CFG_${cfg.tipo.toUpperCase()}, '${id}', ${idx})"
                             title="Eliminar documento"
@@ -401,32 +456,19 @@ window.DocumentosModule = (function () {
                         ><i class="bi bi-trash3"></i></button>
                     </td>
                     ${!isPagar ? `
-                    <td style="padding:4px 8px;text-align:center;">
+                    <td style="padding:4px 6px;text-align:center;">
                         <select class="form-select form-select-sm estado-doc-select" 
                                 style="font-size:0.75rem;padding:3px 6px;border-radius:6px;border-color:#cbd5e1;width:115px;" 
                                 data-nro="${d.nro || d.numero || ''}" 
                                 data-rut="${d.rut || r.rut || ''}" 
                                 data-init-val="${estadoCurrent}"
-                                data-pagado="${pagadoDoc}"
-                                data-impago="${impagoDoc}"
-                                onchange="DocumentosModule.onEstadoDocDetalleChange()">
+                                onchange="DocumentosModule.onDocDetailAmountChange('${cfg.tipo}', '${id}')">
                             <option value="pendiente" ${estadoCurrent === 'pendiente' ? 'selected' : ''}>🔴 Pendiente</option>
                             <option value="parcial" ${estadoCurrent === 'parcial' ? 'selected' : ''}>🟡 Parcial</option>
                             <option value="pagada" ${estadoCurrent === 'pagada' || estadoCurrent === 'pagado' ? 'selected' : ''}>🟢 Pagado</option>
                         </select>
                     </td>
                     ` : ''}
-                `;
-
-                return `
-                <tr>
-                    <td style="padding:6px 10px;">
-                        <span class="badge" style="background:#eff6ff;color:#2563eb;font-size:.72rem;">${d.tipo || 'Sin tipo'}</span>
-                    </td>
-                    <td style="padding:6px 10px;font-size:.78rem;font-weight:500;">${folioDoc}</td>
-                    <td style="padding:6px 10px;font-size:.76rem;color:#64748b;">${d.fecha || '—'}</td>
-                    <td style="padding:6px 10px;text-align:right;color:#2563eb;font-weight:700;">${PortalApp.fmt(totalMontoDoc)}</td>
-                    ${actionCols}
                 </tr>`;
             }).join('')
             : `<tr><td colspan="8" style="text-align:center;padding:14px;color:#94a3b8;font-size:.78rem;">
@@ -447,46 +489,139 @@ window.DocumentosModule = (function () {
             <div class="col-6"><div style="font-size:.70rem;color:#8fa3bc;">RUT</div><div style="font-size:.88rem;font-weight:600;">${r.rut || '—'}</div></div>
             <div class="col-12">
                 <div style="font-size:.70rem;color:#8fa3bc;">Total Impago</div>
-                <div style="font-size:1.4rem;font-weight:800;color:${color};">${PortalApp.fmt(totalImpagoMonto)}</div>
+                <div style="font-size:1.4rem;font-weight:800;color:${color};" id="detalleTotalImpagoHeader">${PortalApp.fmt(totalImpagoMonto)}</div>
             </div>
         </div>
         <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px;font-size:.74rem;color:#92400e;margin-bottom:10px;">
-            <i class="bi bi-exclamation-triangle-fill me-1 text-warning"></i>
-            Los cambios se guardan automáticamente en la base de datos al presionar Aplicar Cambios.
+            <i class="bi bi-pencil-square me-1 text-warning"></i>
+            Puedes modificar los montos, tipo, número y fecha directamente en la tabla. Presiona <strong>Guardar Cambios</strong> para actualizar la base de datos.
         </div>
-        <div style="font-size:.78rem;font-weight:600;color:#1a2940;margin-bottom:6px;">
-            <i class="bi bi-receipt me-1" style="color:${color};"></i>
-            Documentos <span class="badge" style="background:#eff6ff;color:#2563eb;margin-left:4px;">${docs.length}</span>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div style="font-size:.78rem;font-weight:600;color:#1a2940;">
+                <i class="bi bi-receipt me-1" style="color:${color};"></i>
+                Documentos <span class="badge" style="background:#eff6ff;color:#2563eb;margin-left:4px;">${docs.length}</span>
+            </div>
+            <button class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:0.75rem;border-radius:6px;" onclick="DocumentosModule.agregarDocDetalle(window._CFG_${cfg.tipo.toUpperCase()}, '${id}')">
+                <i class="bi bi-plus-lg me-1"></i>Agregar Documento
+            </button>
         </div>
         <div style="max-height:380px;overflow-y:auto;overflow-x:auto;border-radius:8px;border:1px solid #e5eaf0;position:relative;">
             <table class="table table-sm mb-0" style="font-size:.78rem;width:100%;">
                 <thead style="position:sticky;top:0;z-index:10;background:#f8fafc;">
                     <tr style="background:#f8fafc;">
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Tipo</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">N° Doc.</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Fecha</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Total</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#059669;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Pagado</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#d97706;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Impago</th>
-                        <th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:70px;background:#f8fafc;">Acciones</th>
-                        ${!isPagar ? `<th style="padding:8px 10px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:115px;background:#f8fafc;">Estado</th>` : ''}
+                        <th style="padding:8px 6px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Tipo</th>
+                        <th style="padding:8px 6px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">N° Doc.</th>
+                        <th style="padding:8px 6px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;background:#f8fafc;">Fecha</th>
+                        <th style="padding:8px 6px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Total ($)</th>
+                        <th style="padding:8px 6px;font-size:.68rem;color:#059669;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Pagado ($)</th>
+                        <th style="padding:8px 6px;font-size:.68rem;color:#d97706;font-weight:600;text-transform:uppercase;text-align:right;background:#f8fafc;">Impago ($)</th>
+                        <th style="padding:8px 6px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:70px;background:#f8fafc;">Acciones</th>
+                        ${!isPagar ? `<th style="padding:8px 6px;font-size:.68rem;color:#8fa3bc;font-weight:600;text-transform:uppercase;text-align:center;min-width:115px;background:#f8fafc;">Estado</th>` : ''}
                     </tr>
                 </thead>
                 <tbody>${docsRows}</tbody>
-                ${docs.length > 1 ? `
                 <tfoot style="position:sticky;bottom:0;z-index:10;background:#f0f4f9;">
                     <tr style="background:#f0f4f9;">
                         <td colspan="5" style="padding:8px 12px;font-size:.74rem;font-weight:700;color:#1a2940;text-align:right;background:#f0f4f9;">TOTAL IMPAGO</td>
-                        <td style="padding:8px 12px;text-align:right;font-weight:800;color:${color};background:#f0f4f9;">${PortalApp.fmt(totalImpagoMonto)}</td>
+                        <td style="padding:8px 12px;text-align:right;font-weight:800;color:${color};background:#f0f4f9;" id="detalleTotalImpagoFooter">${PortalApp.fmt(totalImpagoMonto)}</td>
                         <td colspan="${isPagar ? 1 : 2}" style="background:#f0f4f9;"></td>
                     </tr>
-                </tfoot>` : ''}
+                </tfoot>
             </table>
         </div>`;
 
-        // Asegurar que el botón Aplicar esté oculto al renderizar de nuevo
-        const btn = document.getElementById('btnAplicarEstadoDetalle');
-        if (btn) btn.style.display = 'none';
+        const btnSave = document.getElementById(cfg.btnGuardarDetalle || (isPagar ? 'btnGuardarDetallePagar' : 'btnAplicarEstadoDetalle'));
+        if (btnSave) btnSave.style.display = 'none';
+    }
+
+    function onDocDetailAmountChange(tipo, id) {
+        const cfg = (tipo === 'cobrar') ? window._CFG_COBRAR : window._CFG_PAGAR;
+        const body = document.getElementById(cfg.detalleBody);
+        if (!body) return;
+
+        let totalImpagoNuevo = 0;
+        const rows = body.querySelectorAll('.doc-detail-row');
+        rows.forEach(row => {
+            const inputTotal = row.querySelector('.doc-input-total');
+            const inputPagado = row.querySelector('.doc-input-pagado');
+            const impagoCell = row.querySelector('.doc-impago-val');
+
+            const tot = parseFloat(inputTotal?.value) || 0;
+            const pag = parseFloat(inputPagado?.value) || 0;
+            const imp = Math.max(0, tot - pag);
+
+            if (impagoCell) impagoCell.textContent = PortalApp.fmt(imp);
+            totalImpagoNuevo += imp;
+        });
+
+        const hdrEl = document.getElementById('detalleTotalImpagoHeader');
+        if (hdrEl) hdrEl.textContent = PortalApp.fmt(totalImpagoNuevo);
+        const ftrEl = document.getElementById('detalleTotalImpagoFooter');
+        if (ftrEl) ftrEl.textContent = PortalApp.fmt(totalImpagoNuevo);
+
+        const btnSave = document.getElementById(cfg.btnGuardarDetalle || (cfg.tipo === 'pagar' ? 'btnGuardarDetallePagar' : 'btnAplicarEstadoDetalle'));
+        if (btnSave) btnSave.style.display = 'inline-block';
+    }
+
+    async function guardarCambiosDetalle(cfg) {
+        const id = window['_detalleId_' + cfg.tipo];
+        if (!id) return;
+
+        const db = cfg.db();
+        const r = db.find(x => String(x.id) === String(id));
+        if (!r) return;
+
+        const body = document.getElementById(cfg.detalleBody);
+        if (!body) return;
+
+        const rows = body.querySelectorAll('.doc-detail-row');
+        const updatedDocs = [];
+        let nuevoTotalImpago = 0;
+
+        rows.forEach(row => {
+            const tipo = row.querySelector('.doc-input-tipo')?.value.trim() || 'Factura';
+            const nro = row.querySelector('.doc-input-nro')?.value.trim() || 'N/A';
+            const fecha = row.querySelector('.doc-input-fecha')?.value.trim() || new Date().toISOString().slice(0, 10);
+            const total = parseFloat(row.querySelector('.doc-input-total')?.value) || 0;
+            const pagado = parseFloat(row.querySelector('.doc-input-pagado')?.value) || 0;
+            const impago = Math.max(0, total - pagado);
+            const estadoSelect = row.querySelector('.estado-doc-select');
+            const estado = estadoSelect ? estadoSelect.value : (impago === 0 ? 'pagada' : (pagado > 0 ? 'parcial' : 'pendiente'));
+
+            if (nro) {
+                updatedDocs.push({
+                    tipo,
+                    nro,
+                    numero: nro,
+                    fecha,
+                    total,
+                    monto: total,
+                    pagado,
+                    impago,
+                    estado,
+                    rut: r.rut || ''
+                });
+                nuevoTotalImpago += impago;
+            }
+        });
+
+        r.docs = updatedDocs;
+        r.monto = nuevoTotalImpago;
+
+        const btn = document.getElementById(cfg.btnGuardarDetalle || (cfg.tipo === 'pagar' ? 'btnGuardarDetallePagar' : 'btnAplicarEstadoDetalle'));
+        const textOrig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...'; }
+
+        try {
+            await guardarEnBD(cfg);
+            if (btn) { btn.disabled = false; btn.innerHTML = textOrig; btn.style.display = 'none'; }
+            PortalApp.toast('✓ Cambios guardados correctamente en la base de datos', 'success');
+            const modalEl = document.getElementById(cfg.modalDetalle);
+            if (modalEl) PortalApp.hideModal(cfg.modalDetalle);
+        } catch (e) {
+            if (btn) { btn.disabled = false; btn.innerHTML = textOrig; }
+            PortalApp.toast('Error al guardar cambios: ' + e.message, 'danger');
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -1385,6 +1520,7 @@ window.DocumentosModule = (function () {
         renderTabla, filtrar, abrirModalAgregar, guardarRegistro,
         verDetalle, _renderDetalleBody,
         onEstadoDocDetalleChange, aplicarCambiosEstadoDetalle,
+        onDocDetailAmountChange, guardarCambiosDetalle,
         abrirAbonoCobrarPrompt,
         abrirModalAbonoPagar, guardarAbonoPagar, eliminarAbonoPagar,
         eliminarDocDetalle, agregarDocDetalle,

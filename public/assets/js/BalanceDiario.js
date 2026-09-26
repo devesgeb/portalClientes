@@ -69,6 +69,7 @@ const CFG_COBRAR = {
     btnConfirmarOk: 'btnConfirmarEliminarOk',
     // Botón sync BD
     btnGuardarBD: 'btnGuardarBD',
+    btnGuardarDetalle: 'btnAplicarEstadoDetalle',
     // Excel
     modalExcel: 'modalExcel',
     excelPreviewResumen: 'excelPreviewResumen',
@@ -137,6 +138,7 @@ const CFG_PAGAR = {
     btnConfirmarOk: 'btnConfirmarEliminarOkPagar',
     // Botón sync BD
     btnGuardarBD: 'btnGuardarBDPagar',
+    btnGuardarDetalle: 'btnGuardarDetallePagar',
     // Excel Pagar
     excelPreviewResumen: 'excelPreviewResumenPagar',
     excelPreviewDetalle: 'excelPreviewDetallePagar',
