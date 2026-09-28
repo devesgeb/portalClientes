@@ -375,13 +375,20 @@ class CronController extends BaseController
             }
 
             foreach ($prices as $pr) {
-                // La API devuelve price_list_id / price_net / price_vat / price_total
+                // La API devuelve price_list_id / price_net / price_vat / price_total / price_list_name
                 // El fallback usa product_price_list_id / unit_net / unit_tax / unit_total
                 $listaId     = (int)($pr['price_list_id'] ?? $pr['product_price_list_id'] ?? 1);
-                $nombreLista = $mapListas[$listaId] ?? ('Lista #' . $listaId);
+                $nombreLista = trim((string)($pr['price_list_name'] ?? $mapListas[$listaId] ?? ('Lista #' . $listaId)));
                 $unitNet     = (float)($pr['price_net']   ?? $pr['unit_net']   ?? 0);
                 $unitTax     = (float)($pr['price_vat']   ?? $pr['unit_tax']   ?? 0);
                 $unitTotal   = (float)($pr['price_total'] ?? $pr['unit_total'] ?? 0);
+
+                if ($listaId > 0 && !empty($nombreLista)) {
+                    $db->query("INSERT INTO `tbl_facto_listas_precios` (`facto_lista_id`, `nombre`) VALUES (?, ?)
+                                ON DUPLICATE KEY UPDATE `nombre` = VALUES(`nombre`), `updated_at` = CURRENT_TIMESTAMP;", [
+                        $listaId, $nombreLista
+                    ]);
+                }
 
                 if ($unitTotal == 0 && $unitNet > 0) {
                     $unitTax   = round($unitNet * 0.19, 2);

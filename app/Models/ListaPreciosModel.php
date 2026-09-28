@@ -133,8 +133,8 @@ class ListaPreciosModel extends Model
                         'precios base' => 1, 'base' => 1,
                         'horeca' => 11,
                         'mayorista' => 12,
-                        'distribucion detallista' => 13, 'distribución detallista' => 13,
-                        'distribucion mayorista' => 14, 'distribución mayorista' => 14,
+                        'distribucion detallista' => 14, 'distribución detallista' => 14,
+                        'distribucion mayorista' => 13, 'distribución mayorista' => 13,
                     ];
 
                     $listaLower = strtolower($lista);

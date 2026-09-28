@@ -551,8 +551,8 @@ class BodegaController extends BaseController
             }
         }
 
-        // Orden específico deseado: 1: Precios base, 11: Horeca, 12: Mayorista, 13: Distribución detallista, 14: Distribución Mayorista
-        $ordenDeseado = [1 => 1, 11 => 2, 12 => 3, 13 => 4, 14 => 5];
+        // Orden específico deseado: 1: Precios base, 11: Horeca, 12: Mayorista, 14: Distribución detallista, 13: Distribución Mayorista
+        $ordenDeseado = [1 => 1, 11 => 2, 12 => 3, 14 => 4, 13 => 5];
         usort($listas, function($a, $b) use ($ordenDeseado) {
             $posA = $ordenDeseado[(int)$a['facto_lista_id']] ?? 99;
             $posB = $ordenDeseado[(int)$b['facto_lista_id']] ?? 99;
