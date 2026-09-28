@@ -876,7 +876,7 @@ td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
     </tbody>
     <tfoot>
       <!-- Spacer invisible inferior -->
-      <tr class="print-spacer"><td colspan="<?= 3 + count($nombresListas) ?>"></td></tr>
+      <tr class="print-spacer"><td colspan="<?= 2 + count($listasConfig) ?>"></td></tr>
     </tfoot>
   </table>
   <?php $cIdx++; endforeach; ?>
