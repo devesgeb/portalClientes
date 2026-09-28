@@ -578,33 +578,34 @@ class BodegaController extends BaseController
             return $this->response->setBody('<p>No hay productos sincronizados.</p>');
         }
 
-        // ── Listas permitidas (nombre_bd => [etiqueta, color cabecera]) ──
+        // ── Listas permitidas (etiqueta, color y variaciones de nombres) ──
         $listasConfig = [
-            'Precios base'            => ['label' => 'PRECIO BASE',    'color' => '#16a34a'],
-            'Lista #1'                => ['label' => 'PRECIO BASE',    'color' => '#16a34a'],
-            'Horeca'                  => ['label' => 'HORECA',         'color' => '#0369a1'],
-            'Mayorista'               => ['label' => 'MAYORISTA',      'color' => '#7c3aed'],
-            'Distribucion detallista' => ['label' => 'DIST. DETALLE',  'color' => '#b45309'],
-            'Distribucion Mayorista'  => ['label' => 'DIST. MAYOR',    'color' => '#be123c'],
+            'precio_base' => [
+                'label'   => 'PRECIO BASE',
+                'color'   => '#16a34a',
+                'aliases' => ['Precios base', 'Precio base', 'Lista #1', '1']
+            ],
+            'horeca' => [
+                'label'   => 'HORECA',
+                'color'   => '#0369a1',
+                'aliases' => ['Horeca', 'Lista #11', '11']
+            ],
+            'mayorista' => [
+                'label'   => 'MAYORISTA',
+                'color'   => '#7c3aed',
+                'aliases' => ['Mayorista', 'Lista #12', '12']
+            ],
+            'distribucion_detallista' => [
+                'label'   => 'DIST. DETALLE',
+                'color'   => '#b45309',
+                'aliases' => ['Distribución detallista', 'Distribucion detallista', 'Distribución Detallista', 'Distribucion Detallista', 'Dist. Detallista', 'Lista #13', '13']
+            ],
+            'distribucion_mayorista' => [
+                'label'   => 'DIST. MAYOR',
+                'color'   => '#be123c',
+                'aliases' => ['Distribución Mayorista', 'Distribucion Mayorista', 'Distribución mayorista', 'Distribucion mayorista', 'Dist. Mayorista', 'Lista #14', '14']
+            ],
         ];
-
-        // Filtrar solo las que existen en BD, usando los nombres corregidos
-        $listasEnBD = $db->query(
-            "SELECT DISTINCT COALESCE(l.nombre, p.nombre_lista) AS nombre_lista 
-             FROM tbl_facto_productos p
-             LEFT JOIN tbl_facto_listas_precios l ON p.facto_lista_id = l.facto_lista_id
-             WHERE COALESCE(l.nombre, p.nombre_lista) IS NOT NULL"
-        )->getResultArray();
-        $listasEnBDSet = array_flip(array_column($listasEnBD, 'nombre_lista'));
-
-        $nombresListas   = [];
-        $etiquetasUsadas = [];
-        foreach ($listasConfig as $nombreBD => $cfg) {
-            if (isset($listasEnBDSet[$nombreBD]) && !in_array($cfg['label'], $etiquetasUsadas, true)) {
-                $nombresListas[$nombreBD] = $cfg;
-                $etiquetasUsadas[]        = $cfg['label'];
-            }
-        }
 
         // ── Un SKU por fila con GROUP BY ──
         $skusRaw = $db->query(
@@ -619,16 +620,31 @@ class BodegaController extends BaseController
               ORDER BY sku ASC"
         )->getResultArray();
 
-        // ── Precios por SKU y lista ──
+        // ── Precios por SKU e identificadores/nombres ──
         $preciosPorSku = [];
-        $queryPrecios = "SELECT p.sku, COALESCE(l.nombre, p.nombre_lista) AS nombre_lista, p.precio_neto, p.precio_total 
+        $queryPrecios = "SELECT p.sku, 
+                                COALESCE(l.nombre, p.nombre_lista) AS nombre_lista, 
+                                p.nombre_lista AS raw_nombre_lista,
+                                p.facto_lista_id, 
+                                p.precio_neto, 
+                                p.precio_total 
                          FROM tbl_facto_productos p
                          LEFT JOIN tbl_facto_listas_precios l ON p.facto_lista_id = l.facto_lista_id";
         foreach ($db->query($queryPrecios)->getResultArray() as $pr) {
-            $preciosPorSku[$pr['sku']][$pr['nombre_lista']] = [
+            $sku = $pr['sku'];
+            $val = [
                 'neto'  => $pr['precio_neto'],
                 'total' => $pr['precio_total'],
             ];
+            if (!empty($pr['nombre_lista'])) {
+                $preciosPorSku[$sku][$pr['nombre_lista']] = $val;
+            }
+            if (!empty($pr['raw_nombre_lista'])) {
+                $preciosPorSku[$sku][$pr['raw_nombre_lista']] = $val;
+            }
+            if (!empty($pr['facto_lista_id'])) {
+                $preciosPorSku[$sku][(string)$pr['facto_lista_id']] = $val;
+            }
         }
 
         // ── Categorías derivadas del prefijo del SKU ──
@@ -657,7 +673,7 @@ class BodegaController extends BaseController
 
         $totalSkus   = count($skusRaw);
         $totalCats   = count($porCategoria);
-        $totalListas = count($nombresListas);
+        $totalListas = count($listasConfig);
         $fechaGen    = date('d/m/Y H:i');
         $empresa     = 'F Alimentos SpA';
 
@@ -802,10 +818,10 @@ td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
   <table class="<?= $numProds <= 12 ? 'avoid-break' : '' ?>">
     <thead>
       <!-- Spacer invisible superior para cuando la tabla salta de página o inicia -->
-      <tr class="print-spacer"><th colspan="<?= 3 + count($nombresListas) ?>" style="border:none !important; background:#fff !important; padding:0 !important;"></th></tr>
+      <tr class="print-spacer"><th colspan="<?= 2 + count($listasConfig) ?>" style="border:none !important; background:#fff !important; padding:0 !important;"></th></tr>
       <!-- Fila de Categoría integrada en el thead -->
       <tr>
-        <th colspan="<?= 3 + count($nombresListas) ?>" class="cat-header-cell">
+        <th colspan="<?= 2 + count($listasConfig) ?>" class="cat-header-cell">
           CATEGORÍA: <?= esc(strtoupper($categoria)) ?> 
           <span class="cat-count">(<?= count($productos) ?> Productos)</span>
         </th>
@@ -814,7 +830,7 @@ td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
       <tr class="col-header-row">
         <th class="th-sku">SKU</th>
         <th class="th-desc">Descripción del Producto</th>
-        <?php foreach ($nombresListas as $nombreBD => $cfg): ?>
+        <?php foreach ($listasConfig as $keyLista => $cfg): ?>
         <th>
           <?= esc($cfg['label']) ?>
           <span class="th-sub">(Neto / Total)</span>
@@ -835,13 +851,15 @@ td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
           <?php endif; ?>
         </td>
         
-        <?php foreach ($nombresListas as $nombreBD => $cfg):
-          $pr = $preciosPorSku[$p['sku']][$nombreBD] ?? null;
-          if (!$pr && $nombreBD === 'Precios base') {
-              $pr = $preciosPorSku[$p['sku']]['Lista #1'] ?? null;
-          }
-          if (!$pr && $nombreBD === 'Lista #1') {
-              $pr = $preciosPorSku[$p['sku']]['Precios base'] ?? null;
+        <?php foreach ($listasConfig as $keyLista => $cfg):
+          $pr = null;
+          if (isset($preciosPorSku[$p['sku']])) {
+              foreach ($cfg['aliases'] as $alias) {
+                  if (isset($preciosPorSku[$p['sku']][$alias])) {
+                      $pr = $preciosPorSku[$p['sku']][$alias];
+                      break;
+                  }
+              }
           }
         ?>
         <?php if ($pr && ((float)$pr['total'] > 0 || (float)$pr['neto'] > 0)): ?>
