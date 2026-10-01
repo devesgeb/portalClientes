@@ -168,7 +168,7 @@ class CronController extends BaseController
         $masterEntityId = env('TUPANA_MASTER_ENTITY_ID') ?: '2205607';
 
         // Consultar API oficial de TuPana (o Facto DTEs de ventas emitidas)
-        for ($page = 1; $page <= 5; $page++) {
+        for ($page = 1; $page <= 15; $page++) {
             $url = "https://api.tupana.ai/v1/documents?master_entity_id={$masterEntityId}&page={$page}";
 
             $ch = curl_init();
