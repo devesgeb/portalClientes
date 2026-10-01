@@ -395,9 +395,6 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3" onclick="toggleModalCheckAllMaster(this)">
                             <i class="bi bi-check2-all me-1"></i> Marcar / Desmarcar
                         </button>
-                        <button type="button" class="btn btn-sm btn-warning py-1 px-3 fw-bold text-dark shadow-sm" onclick="marcarSeleccionadosComoPagadosModal()" title="Marcar los seleccionados como Pagados para no trasladarlos a Cuentas por Cobrar">
-                            <i class="bi bi-check-circle-fill me-1 text-success"></i> Marcar Pagados (Omitir)
-                        </button>
                     </div>
                 </div>
 
@@ -431,7 +428,7 @@
             <div class="modal-footer border-top bg-light justify-content-between">
                 <button type="button" class="btn btn-sm btn-light px-3 py-2 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
                 <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-sm btn-warning px-3 py-2 fw-bold text-dark shadow-sm" onclick="marcarSeleccionadosComoPagadosModal()">
+                    <button type="button" class="btn btn-sm btn-warning px-3 py-2 fw-bold text-dark shadow-sm" onclick="marcarSeleccionadosComoPagadosModal(this)">
                         <i class="bi bi-check-circle-fill me-1 text-success"></i> Marcar Seleccionados como Pagados
                     </button>
                     <button type="button" class="btn btn-sm btn-success px-4 py-2 fw-bold" id="btnConfirmarImportación" onclick="confirmarImportacionCobrar()">
@@ -949,29 +946,32 @@
         }
     }
 
-    async function marcarSeleccionadosComoPagadosModal() {
+    async function marcarSeleccionadosComoPagadosModal(btn) {
         const selected = document.querySelectorAll('.modal-doc-checkbox:checked');
         if (selected.length === 0) {
             mostrarToast('Seleccione al menos un documento para marcar como Pagado', 'warning');
             return;
         }
 
-        const confirmResult = await Swal.fire({
-            title: '¿Marcar como Pagados?',
-            text: `Se marcarán ${selected.length} documento(s) como Pagados. No se trasladarán a Cuentas por Cobrar ni a Balance Diario.`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, marcar como Pagados',
-            cancelButtonText: 'Cancelar'
-        });
-
-        if (!confirmResult.isConfirmed) return;
+        if (!confirm(`¿Deseas marcar ${selected.length} documento(s) como PAGADOS?\n\nNo se trasladarán a Cuentas por Cobrar ni a Balance Diario.`)) {
+            return;
+        }
 
         const documentos = Array.from(selected).map(c => {
             const idx = parseInt(c.getAttribute('data-index'));
             const d = modalDocsData[idx];
             return d ? { folio: d.folio, codigo_sii: parseInt(d.codigo_sii) } : null;
         }).filter(Boolean);
+
+        if (documentos.length === 0) {
+            mostrarToast('No se pudieron procesar los documentos seleccionados', 'warning');
+            return;
+        }
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando...`;
+        }
 
         try {
             const response = await fetch(baseUrl + 'cobranza/facto/actualizar-estado-masivo', {
@@ -994,7 +994,12 @@
                 mostrarToast(res.message || 'Error al actualizar documentos', 'danger');
             }
         } catch (e) {
-            mostrarToast('Error al conectar con el servidor', 'danger');
+            mostrarToast('Error de conexión con el servidor', 'danger');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-check-circle-fill me-1 text-success"></i> Marcar Seleccionados como Pagados`;
+            }
         }
     }
 
