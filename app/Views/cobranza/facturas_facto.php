@@ -225,9 +225,14 @@
                     </h6>
                     <span class="text-muted" style="font-size:0.78rem;">Filtra y organiza los documentos emitidos desde TuPana / Facto API</span>
                 </div>
-                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" onclick="sincronizarDtesVentas(event)" style="font-size:0.82rem;">
-                    <i class="bi bi-arrow-repeat me-1"></i>Sincronizar Documentos Ventas
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold shadow-sm" onclick="abrirModalIngresarDteManual()" style="font-size:0.82rem;">
+                        <i class="bi bi-plus-circle me-1"></i>Ingresar DTE Manual
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" onclick="sincronizarDtesVentas(event)" style="font-size:0.82rem;">
+                        <i class="bi bi-arrow-repeat me-1"></i>Sincronizar Documentos Ventas
+                    </button>
+                </div>
             </div>
             
             <form id="formFiltros" onsubmit="event.preventDefault(); buscarDocumentos();">
@@ -436,6 +441,65 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ingresar DTE Manual -->
+<div class="modal fade" id="modalIngresarDteManual" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div class="modal-header py-3" style="background:linear-gradient(135deg,#1e293b,#334155);border:none;">
+                <h6 class="modal-title text-white fw-bold">
+                    <i class="bi bi-plus-circle-fill me-2 text-success"></i>Ingresar DTE Manual (Facto)
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" style="filter:invert(1);"></button>
+            </div>
+            <form id="formIngresarDteManual" onsubmit="event.preventDefault(); guardarDteManual();">
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:0.8rem;border-radius:8px;">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Utiliza esta opción si emitiste un documento recientemente en Facto (ej: Facturas, Guías de Despacho o Notas de Crédito) y aún no aparece en la sincronización automática.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Folio Documento *</label>
+                            <input type="text" class="form-control form-control-sm fw-bold" id="manualFolio" placeholder="Ej: 9384" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Tipo de DTE *</label>
+                            <select class="form-select form-select-sm fw-medium" id="manualCodigoSii" required>
+                                <option value="33" selected>Factura Electrónica (33)</option>
+                                <option value="52">Guía de Despacho (52)</option>
+                                <option value="61">Nota de Crédito (61)</option>
+                                <option value="39">Boleta Electrónica (39)</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Fecha Emisión *</label>
+                            <input type="date" class="form-control form-control-sm" id="manualFecha" value="<?= date('Y-m-d') ?>" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Monto Total ($) *</label>
+                            <input type="number" step="1" min="1" class="form-control form-control-sm fw-bold text-success" id="manualMontoTotal" placeholder="Ej: 17731" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">RUT Cliente</label>
+                            <input type="text" class="form-control form-control-sm" id="manualRutCliente" placeholder="Ej: 76.429.285-5">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-slate-700 fw-semibold" style="font-size:0.8rem;">Razón Social / Nombre Cliente *</label>
+                            <input type="text" class="form-control form-control-sm fw-medium" id="manualRazonSocial" placeholder="Ej: COMIDA RÁPIDA LEPE OROS LIMITADA" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light justify-content-between">
+                    <button type="button" class="btn btn-sm btn-light px-3 py-2 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-success px-4 py-2 fw-bold" id="btnGuardarDteManual">
+                        <i class="bi bi-check-lg me-1"></i> Guardar Documento
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -1077,6 +1141,62 @@
                 btn.disabled = false;
                 btn.innerHTML = oldText;
             }
+        }
+    }
+
+    function abrirModalIngresarDteManual() {
+        document.getElementById('formIngresarDteManual').reset();
+        document.getElementById('manualFecha').value = new Date().toISOString().slice(0, 10);
+        const modal = new bootstrap.Modal(document.getElementById('modalIngresarDteManual'));
+        modal.show();
+    }
+
+    async function guardarDteManual() {
+        const folio = document.getElementById('manualFolio').value.trim();
+        const codigoSii = parseInt(document.getElementById('manualCodigoSii').value);
+        const fecha = document.getElementById('manualFecha').value;
+        const montoTotal = parseFloat(document.getElementById('manualMontoTotal').value) || 0;
+        const rutCliente = document.getElementById('manualRutCliente').value.trim();
+        const razonSocial = document.getElementById('manualRazonSocial').value.trim();
+
+        if (!folio || montoTotal <= 0 || !razonSocial) {
+            mostrarToast('Por favor completa los campos requeridos correctamente.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btnGuardarDteManual');
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Guardando...`;
+
+        try {
+            const response = await fetch(baseUrl + 'cobranza/facto/ingresar-manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folio,
+                    codigo_sii: codigoSii,
+                    fecha,
+                    monto_total: montoTotal,
+                    rut_cliente: rutCliente,
+                    razon_social: razonSocial
+                })
+            });
+            const res = await response.json();
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-check-lg me-1"></i> Guardar Documento`;
+
+            if (res.success) {
+                mostrarToast(res.message, 'success');
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('modalIngresarDteManual'));
+                if (modalInstance) modalInstance.hide();
+                buscarDocumentos();
+            } else {
+                mostrarToast(res.message || 'Error al registrar documento', 'danger');
+            }
+        } catch (e) {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-check-lg me-1"></i> Guardar Documento`;
+            mostrarToast('Error de conexión con el servidor', 'danger');
         }
     }
 

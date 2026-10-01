@@ -117,6 +117,7 @@ $routes->post('/cobranza/facto/importar-a-cobrar',     'FactoController::importa
 $routes->post('/cobranza/facto/marcar-pagadas-desde-cobrar', 'FactoController::marcarPagadasDesdeCobrar');
 $routes->post('/cuentas-cobrar/marcar-pagadas-desde-cobrar', 'FactoController::marcarPagadasDesdeCobrar');
 $routes->post('/cobranza/facto/actualizar-estado-flujo', 'FactoController::actualizarEstadoFlujo');
+$routes->post('/cobranza/facto/ingresar-manual', 'FactoController::ingresarManual');
 $routes->get('/ejecutar-migracion-db-prod', 'FactoController::ejecutarMigracionDb');
 
 // ── Cobranza / Manejo de Caja

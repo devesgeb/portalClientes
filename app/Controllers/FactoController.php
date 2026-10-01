@@ -299,6 +299,61 @@ class FactoController extends BaseController
     }
 
     /**
+     * POST /cobranza/facto/ingresar-manual
+     * Registra manualmente un DTE de Facto en tbl_facto_pagos (para DTEs recién emitidos en Facto)
+     */
+    public function ingresarManual(): ResponseInterface
+    {
+        $json = [];
+        try {
+            $json = $this->request->getJSON(true) ?: [];
+        } catch (\Throwable $t) {
+            $json = [];
+        }
+        if (empty($json)) {
+            $raw = $this->request->getBody();
+            $json = json_decode($raw, true) ?: $this->request->getPost();
+        }
+
+        $folio       = trim((string)($json['folio'] ?? ''));
+        $codigoSii   = (int)($json['codigo_sii'] ?? 33);
+        $fecha       = trim((string)($json['fecha'] ?? date('Y-m-d')));
+        $rutCliente  = trim((string)($json['rut_cliente'] ?? ''));
+        $razonSocial = trim((string)($json['razon_social'] ?? ''));
+        $montoTotal  = (float)($json['monto_total'] ?? 0);
+
+        if (empty($folio) || $montoTotal <= 0) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Indique un número de folio válido y un monto total mayor a cero.'
+            ]);
+        }
+
+        $neto = round($montoTotal / 1.19, 2);
+        $iva  = round($montoTotal - $neto, 2);
+
+        $db = \Config\Database::connect();
+        $sql = "INSERT INTO `tbl_facto_pagos` 
+                (`folio`, `codigo_sii`, `rut_cliente`, `razon_social`, `monto_neto`, `monto_iva`, `monto_total`, `fecha_emision`, `estado_sii`, `estado_pago`, `monto_pagado`, `observacion`)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Aceptado', 'pendiente', 0.00, 'Ingreso Manual')
+                ON DUPLICATE KEY UPDATE 
+                  `rut_cliente` = VALUES(`rut_cliente`),
+                  `razon_social` = VALUES(`razon_social`),
+                  `monto_neto` = VALUES(`monto_neto`),
+                  `monto_iva` = VALUES(`monto_iva`),
+                  `monto_total` = VALUES(`monto_total`),
+                  `fecha_emision` = VALUES(`fecha_emision`),
+                  `updated_at` = CURRENT_TIMESTAMP;";
+
+        $db->query($sql, [$folio, $codigoSii, $rutCliente, $razonSocial, $neto, $iva, $montoTotal, $fecha]);
+
+        return $this->response->setJSON([
+            'success' => true,
+            'message' => "Documento folio {$folio} registrado correctamente."
+        ]);
+    }
+
+    /**
      * POST /cobranza/facto/actualizar-estado-masivo
      * Actualiza de forma masiva múltiples documentos seleccionados desde el combo box.
      */
