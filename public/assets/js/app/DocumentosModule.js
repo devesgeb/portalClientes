@@ -155,7 +155,7 @@ window.DocumentosModule = (function () {
         if (fOtro) fOtro.style.display = 'none';
 
         const db = cfg.db();
-        const r = id ? db.find(x => x.id === id) : null;
+        const r = id ? db.find(x => String(x.id) === String(id)) : null;
 
         if (r) {
             // Editar: cargar datos
@@ -248,7 +248,7 @@ window.DocumentosModule = (function () {
 
         if (editingId) {
             // Editar
-            const r = db.find(x => x.id === editingId);
+            const r = db.find(x => String(x.id) === String(editingId));
             if (r) {
                 r.nombre = nombre; r.cliente = nombre; r.proveedor = nombre;
                 r.rut = rut;
@@ -657,16 +657,18 @@ window.DocumentosModule = (function () {
 
     function agregarDocDetalle(cfg, entidadId) {
         const db = cfg.db();
-        const r = db.find(x => x.id === entidadId);
+        const r = db.find(x => String(x.id) === String(entidadId));
         if (!r) return;
         if (!r.docs) r.docs = [];
         r.docs.push({
             tipo: 'Factura', nro: '',
-            fecha: new Date().toLocaleDateString('es-CL'),
+            fecha: new Date().toISOString().slice(0, 10),
             monto: 0, total: 0,
         });
         const body = document.getElementById(cfg.detalleBody);
         _renderDetalleBody(cfg, entidadId, body);
+        const btnSave = document.getElementById(cfg.btnGuardarDetalle || (cfg.tipo === 'pagar' ? 'btnGuardarDetallePagar' : 'btnAplicarEstadoDetalle'));
+        if (btnSave) btnSave.style.display = 'inline-block';
         PortalApp.toast('Nueva fila agregada. Completa los datos y presiona Guardar en BD.', 'warning');
     }
 
@@ -675,7 +677,7 @@ window.DocumentosModule = (function () {
     // ─────────────────────────────────────────────────────────────────────
     function eliminar(cfg, id) {
         const db = cfg.db();
-        const r = db.find(x => x.id === id);
+        const r = db.find(x => String(x.id) === String(id));
         if (!r) return;
 
         _eliminarPendiente = { cfg, id };
@@ -698,7 +700,7 @@ window.DocumentosModule = (function () {
 
         const { id } = _eliminarPendiente;
         const db = cfg.db();
-        const r = db.find(x => x.id === id);
+        const r = db.find(x => String(x.id) === String(id));
         if (!r) return;
 
         const btnConfirm = document.getElementById(cfg.btnConfirmarOk);
