@@ -313,6 +313,37 @@ class CronController extends BaseController
         // 1. Obtener y guardar Listas de Precios desde Facto API
         $mapListas = $this->fetchAndSavePriceLists($token, $db);
 
+        // Mapas locales para preservar stock, stock reservado y costo neto si la API de Facto no los incluye
+        $localProdMap = [];
+        if ($db->tableExists('tbl_productos')) {
+            $prodsLocal = $db->query("SELECT sku, stock_bodega_ppral, stock_reservado, costo_neto FROM tbl_productos")->getResultArray();
+            foreach ($prodsLocal as $pl) {
+                $skuKey = strtolower(trim($pl['sku'] ?? ''));
+                if ($skuKey !== '') {
+                    $localProdMap[$skuKey] = [
+                        'stock'           => (float)($pl['stock_bodega_ppral'] ?? 0),
+                        'stock_reservado' => (float)($pl['stock_reservado'] ?? 0),
+                        'costo_neto'      => (float)($pl['costo_neto'] ?? 0),
+                    ];
+                }
+            }
+        }
+
+        $existingFactoMap = [];
+        if ($db->tableExists('tbl_facto_productos')) {
+            $prodsFacto = $db->query("SELECT sku, stock, stock_reservado, costo_neto FROM tbl_facto_productos WHERE stock > 0 OR stock_reservado > 0 OR costo_neto > 0")->getResultArray();
+            foreach ($prodsFacto as $pf) {
+                $skuKey = strtolower(trim($pf['sku'] ?? ''));
+                if ($skuKey !== '' && !isset($existingFactoMap[$skuKey])) {
+                    $existingFactoMap[$skuKey] = [
+                        'stock'           => (float)($pf['stock'] ?? 0),
+                        'stock_reservado' => (float)($pf['stock_reservado'] ?? 0),
+                        'costo_neto'      => (float)($pf['costo_neto'] ?? 0),
+                    ];
+                }
+            }
+        }
+
         // 2. Obtener lista de productos desde Facto API
         $productListSummary = $this->fetchFactoProductList($token);
 
@@ -331,33 +362,58 @@ class CronController extends BaseController
             if (empty($sku)) {
                 $sku = 'FACTO-' . $pId;
             }
+            $skuLower     = strtolower($sku);
             $nombre       = trim((string)($pDetail['name'] ?? 'Producto ' . $pId));
             $descripcion  = trim((string)($pDetail['additional_details'] ?? $pDetail['invoicing_details'] ?? ''));
             $marca        = trim((string)($pDetail['brand'] ?? ''));
             $modelo       = trim((string)($pDetail['model'] ?? ''));
             $unidadMedida = trim((string)($pDetail['measure_unit'] ?? 'UN'));
 
-            // Extraer costo neto y costo con impuesto (19% IVA)
-            $costoNeto = (float)($pDetail['cost']['value'] ?? 0);
-            $costoTotal = round($costoNeto * 1.19, 2);
-
-            // Calcular Stock y Stock Reservado desde la estructura de inventarios
-            $stock = 0.000;
-            $stockReservado = 0.000;
+            // Intentar obtener stock y costo desde la respuesta de Facto API si vinieran
+            $stockFromFacto = 0.000;
+            $stockReservadoFromFacto = 0.000;
+            $hasFactoStock = false;
 
             if (!empty($pDetail['inventories']['details']) && is_array($pDetail['inventories']['details'])) {
                 foreach ($pDetail['inventories']['details'] as $invDet) {
-                    $stock += (float)($invDet['available_quantity'] ?? 0);
-                    $stockReservado += (float)($invDet['reserved_quantity'] ?? 0);
+                    $stockFromFacto += (float)($invDet['available_quantity'] ?? 0);
+                    $stockReservadoFromFacto += (float)($invDet['reserved_quantity'] ?? 0);
                 }
-            } else {
-                if (isset($pDetail['inventories']['total_available'])) {
-                    $stock = (float)$pDetail['inventories']['total_available'];
-                }
-                if (isset($pDetail['inventories']['total_reserved'])) {
-                    $stockReservado = (float)$pDetail['inventories']['total_reserved'];
-                }
+                $hasFactoStock = true;
+            } elseif (isset($pDetail['inventories']['total_available'])) {
+                $stockFromFacto = (float)$pDetail['inventories']['total_available'];
+                $stockReservadoFromFacto = (float)($pDetail['inventories']['total_reserved'] ?? 0);
+                $hasFactoStock = true;
             }
+
+            $costoNetoFromFacto = (float)($pDetail['cost']['value'] ?? 0);
+
+            // Determinar Stock y Stock Reservado priorizando la fuente local si la API devuelve 0
+            if ($hasFactoStock && ($stockFromFacto > 0 || $stockReservadoFromFacto > 0)) {
+                $stock = $stockFromFacto;
+                $stockReservado = $stockReservadoFromFacto;
+            } elseif (isset($localProdMap[$skuLower])) {
+                $stock = $localProdMap[$skuLower]['stock'];
+                $stockReservado = $localProdMap[$skuLower]['stock_reservado'];
+            } elseif (isset($existingFactoMap[$skuLower])) {
+                $stock = $existingFactoMap[$skuLower]['stock'];
+                $stockReservado = $existingFactoMap[$skuLower]['stock_reservado'];
+            } else {
+                $stock = 0.000;
+                $stockReservado = 0.000;
+            }
+
+            // Determinar Costo Neto y Costo Total
+            if ($costoNetoFromFacto > 0) {
+                $costoNeto = $costoNetoFromFacto;
+            } elseif (isset($localProdMap[$skuLower]) && $localProdMap[$skuLower]['costo_neto'] > 0) {
+                $costoNeto = $localProdMap[$skuLower]['costo_neto'];
+            } elseif (isset($existingFactoMap[$skuLower]) && $existingFactoMap[$skuLower]['costo_neto'] > 0) {
+                $costoNeto = $existingFactoMap[$skuLower]['costo_neto'];
+            } else {
+                $costoNeto = 0.00;
+            }
+            $costoTotal = round($costoNeto * 1.19, 2);
 
             $prices = $pDetail['price'] ?? [];
             if (empty($prices) || !is_array($prices)) {
@@ -405,10 +461,10 @@ class CronController extends BaseController
                           `marca`           = VALUES(`marca`),
                           `modelo`          = VALUES(`modelo`),
                           `unidad_medida`   = VALUES(`unidad_medida`),
-                          `stock`           = VALUES(`stock`),
-                          `stock_reservado` = VALUES(`stock_reservado`),
-                          `costo_neto`      = VALUES(`costo_neto`),
-                          `costo_total`     = VALUES(`costo_total`),
+                          `stock`           = IF(VALUES(`stock`) > 0, VALUES(`stock`), `tbl_facto_productos`.`stock`),
+                          `stock_reservado` = IF(VALUES(`stock_reservado`) > 0, VALUES(`stock_reservado`), `tbl_facto_productos`.`stock_reservado`),
+                          `costo_neto`      = IF(VALUES(`costo_neto`) > 0, VALUES(`costo_neto`), `tbl_facto_productos`.`costo_neto`),
+                          `costo_total`     = IF(VALUES(`costo_total`) > 0, VALUES(`costo_total`), `tbl_facto_productos`.`costo_total`),
                           `nombre_lista`    = VALUES(`nombre_lista`),
                           `precio_neto`     = VALUES(`precio_neto`),
                           `precio_impuesto` = VALUES(`precio_impuesto`),

@@ -914,37 +914,44 @@ td.td-precio.no-precio{text-align:center;color:#cbd5e1;font-size:9pt;}
         $listaId = $this->request->getGet('lista_id');
         $q       = trim((string)$this->request->getGet('q'));
 
-        $builder = $db->table('tbl_facto_productos');
+        $builder = $db->table('tbl_facto_productos f')
+                      ->select('f.id, f.facto_product_id, f.sku, f.nombre, f.descripcion, f.marca, f.modelo, f.unidad_medida, f.facto_lista_id, f.nombre_lista, f.precio_neto, f.precio_impuesto, f.precio_total, f.created_at, f.updated_at')
+                      ->select('COALESCE(NULLIF(f.stock, 0), p.stock_bodega_ppral, 0) AS stock', false)
+                      ->select('COALESCE(NULLIF(f.stock_reservado, 0), p.stock_reservado, 0) AS stock_reservado', false)
+                      ->select('COALESCE(NULLIF(f.costo_neto, 0), p.costo_neto, 0) AS costo_neto', false)
+                      ->select('COALESCE(NULLIF(f.costo_total, 0), ROUND(COALESCE(NULLIF(f.costo_neto, 0), p.costo_neto, 0) * 1.19, 2), 0) AS costo_total', false)
+                      ->join('tbl_productos p', 'p.sku COLLATE utf8mb4_general_ci = f.sku COLLATE utf8mb4_general_ci', 'left', false);
 
         if ($listaId === 'all' || $listaId === 'todas') {
             // No filtrar por facto_lista_id para exportaciones completas
         } elseif (!empty($listaId) && is_numeric($listaId)) {
-            $builder->where('facto_lista_id', (int)$listaId);
+            $builder->where('f.facto_lista_id', (int)$listaId);
         } else {
             // Por defecto si viene vacío o no especificado: Precios base (facto_lista_id = 1)
-            $builder->where('facto_lista_id', 1);
+            $builder->where('f.facto_lista_id', 1);
         }
 
         if (!empty($q)) {
             $builder->groupStart()
-                    ->like('sku', $q)
-                    ->orLike('nombre', $q)
-                    ->orLike('descripcion', $q)
-                    ->orLike('marca', $q)
+                    ->like('f.sku', $q)
+                    ->orLike('f.nombre', $q)
+                    ->orLike('f.descripcion', $q)
+                    ->orLike('f.marca', $q)
                     ->groupEnd();
         }
 
-        $productos = $builder->orderBy('nombre', 'ASC')
-                             ->orderBy('nombre_lista', 'ASC')
+        $productos = $builder->orderBy('f.nombre', 'ASC')
+                             ->orderBy('f.nombre_lista', 'ASC')
                              ->get()->getResultArray();
 
         // Calcular Estadísticas
         $statsRaw = $db->query("SELECT 
-            COUNT(DISTINCT sku) as total_skus,
-            COUNT(DISTINCT facto_lista_id) as total_listas,
-            SUM(DISTINCT stock) as stock_total,
-            AVG(precio_neto) as promedio_neto
-            FROM tbl_facto_productos")->getRowArray();
+            COUNT(DISTINCT f.sku) as total_skus,
+            COUNT(DISTINCT f.facto_lista_id) as total_listas,
+            SUM(DISTINCT COALESCE(NULLIF(f.stock, 0), p.stock_bodega_ppral, 0)) as stock_total,
+            AVG(f.precio_neto) as promedio_neto
+            FROM tbl_facto_productos f
+            LEFT JOIN tbl_productos p ON p.sku COLLATE utf8mb4_general_ci = f.sku COLLATE utf8mb4_general_ci")->getRowArray();
 
         return $this->response->setJSON([
             'success' => true,

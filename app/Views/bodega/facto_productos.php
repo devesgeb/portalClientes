@@ -472,7 +472,7 @@
                         let stockClass = 'text-dark';
                         if (stock <= 0) stockClass = 'text-danger fw-bold';
                         else if (stock < 10) stockClass = 'text-warning fw-bold';
-                        else stockClass = 'text-danger fw-bold';
+                        else stockClass = 'text-success fw-bold';
 
                         let badgeLista = 'custom-badge-lista';
                         const nombreL = (p.nombre_lista || '').toLowerCase();
